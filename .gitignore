@@ -1,0 +1,17 @@
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+.env
+
+# Node files
+node_modules/
+package-lock.json
+package.json
+
+# Build files
+dist/
+build/
+
+# Logs
+logs/
