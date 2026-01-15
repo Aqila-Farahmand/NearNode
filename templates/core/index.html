@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NearNode - Smart Travel Planning</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-hover {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-plane text-2xl"></i>
+                    <h1 class="text-2xl font-bold">NearNode</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="profileBtn" class="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30">
+                        <i class="fas fa-user mr-2"></i>Profile
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- Feature Tabs -->
+        <div class="bg-white rounded-lg shadow-md mb-6">
+            <div class="flex border-b">
+                <button class="tab-btn active px-6 py-4 font-semibold text-blue-600 border-b-2 border-blue-600" data-tab="nearest-alternate">
+                    <i class="fas fa-map-marker-alt mr-2"></i>Nearest Alternate
+                </button>
+                <button class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600" data-tab="multi-modal">
+                    <i class="fas fa-train mr-2"></i>Multi-Modal
+                </button>
+                <button class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600" data-tab="vibe-search">
+                    <i class="fas fa-magic mr-2"></i>AI Vibe Search
+                </button>
+                <button class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600" data-tab="collaborative">
+                    <i class="fas fa-heart mr-2"></i>Collaborative
+                </button>
+                <button class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600" data-tab="delay-check">
+                    <i class="fas fa-shield-alt mr-2"></i>Delay Protection
+                </button>
+            </div>
+        </div>
+
+        <!-- Feature 1: Nearest Alternate -->
+        <div id="nearest-alternate" class="tab-content">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Nearest Alternate Optimization</h2>
+                <p class="text-gray-600 mb-6">Find cheaper flights to nearby airports and calculate total trip cost</p>
+                
+                <form id="nearestAlternateForm" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="origin_airport_code" class="block text-sm font-medium text-gray-700 mb-2">Origin Airport Code</label>
+                            <input type="text" id="origin_airport_code" name="origin_airport_code" placeholder="e.g., MIL" required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="final_destination_address" class="block text-sm font-medium text-gray-700 mb-2">Final Destination Address</label>
+                            <input type="text" id="final_destination_address" name="final_destination_address" placeholder="e.g., 123 Main St, London" required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="nearest_alternate_date" class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                            <input type="date" id="nearest_alternate_date" name="date" required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="radius_km" class="block text-sm font-medium text-gray-700 mb-2">Radius (km)</label>
+                            <input type="number" id="radius_km" name="radius_km" value="100" min="10" max="500"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
+                        <i class="fas fa-search mr-2"></i>Search
+                    </button>
+                </form>
+            </div>
+            <div id="nearestAlternateResults" class="space-y-4"></div>
+        </div>
+
+        <!-- Feature 2: Multi-Modal -->
+        <div id="multi-modal" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Multi-Modal Connection Logic</h2>
+                <p class="text-gray-600 mb-6">Find connections with train links and layover quality scores</p>
+                
+                <form id="multiModalForm" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label for="multi_modal_origin" class="block text-sm font-medium text-gray-700 mb-2">Origin Airport</label>
+                            <input type="text" id="multi_modal_origin" name="origin_airport_code" placeholder="e.g., BRU" required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="multi_modal_destination" class="block text-sm font-medium text-gray-700 mb-2">Destination Airport</label>
+                            <input type="text" id="multi_modal_destination" name="destination_airport_code" placeholder="e.g., AMS" required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="multi_modal_date" class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                            <input type="date" id="multi_modal_date" name="date" required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
+                        <i class="fas fa-search mr-2"></i>Find Connections
+                    </button>
+                </form>
+            </div>
+            <div id="multiModalResults" class="space-y-4"></div>
+        </div>
+
+        <!-- Feature 3: AI Vibe Search -->
+        <div id="vibe-search" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">AI-Driven Vibe Search</h2>
+                <p class="text-gray-600 mb-6">Describe your dream trip in natural language</p>
+                
+                <form id="vibeSearchForm" class="space-y-4">
+                    <div>
+                        <label for="vibe_query" class="block text-sm font-medium text-gray-700 mb-2">What are you looking for?</label>
+                        <textarea id="vibe_query" name="query" rows="3" placeholder='e.g., "I want a warm beach destination within a 5-hour flight of Milan for under €300 this weekend"'
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required></textarea>
+                    </div>
+                    <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
+                        <i class="fas fa-magic mr-2"></i>Find My Trip
+                    </button>
+                </form>
+            </div>
+            <div id="vibeSearchResults" class="space-y-4"></div>
+        </div>
+
+        <!-- Feature 4: Collaborative -->
+        <div id="collaborative" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Collaborative Trip Planning</h2>
+                <p class="text-gray-600 mb-6">Plan trips together with your partner</p>
+                
+                <div class="space-y-4">
+                    <div class="border-l-4 border-blue-500 pl-4">
+                        <h3 class="font-semibold mb-2">Step 1: Generate Sync Code</h3>
+                        <button id="generateCodeBtn" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                            Generate Code
+                        </button>
+                        <div id="syncCodeDisplay" class="mt-2"></div>
+                    </div>
+                    
+                    <div class="border-l-4 border-green-500 pl-4">
+                        <h3 class="font-semibold mb-2">Step 2: Link Partner</h3>
+                        <div class="flex space-x-2">
+                            <input type="text" id="partnerSyncCode" placeholder="Enter partner's code"
+                                class="flex-1 px-4 py-2 border border-gray-300 rounded-lg">
+                            <button id="linkPartnerBtn" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
+                                Link
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="collaborativeResults" class="space-y-4"></div>
+        </div>
+
+        <!-- Feature 5: Delay Protection -->
+        <div id="delay-check" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Delay Prediction & Self-Transfer Insurance</h2>
+                <p class="text-gray-600 mb-6">Check delay probability and self-transfer safety</p>
+                
+                <form id="delayCheckForm" class="space-y-4">
+                    <div>
+                        <label for="flight_id" class="block text-sm font-medium text-gray-700 mb-2">Flight ID</label>
+                        <input type="number" id="flight_id" name="flight_id" placeholder="Enter flight ID" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
+                        <i class="fas fa-shield-alt mr-2"></i>Check Delay Risk
+                    </button>
+                </form>
+            </div>
+            <div id="delayCheckResults" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('active', 'text-blue-600', 'border-b-2', 'border-blue-600');
+                    b.classList.add('text-gray-600');
+                });
+                btn.classList.add('active', 'text-blue-600', 'border-b-2', 'border-blue-600');
+                btn.classList.remove('text-gray-600');
+                
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                document.getElementById(tab).classList.remove('hidden');
+            });
+        });
+
+        // Feature 1: Nearest Alternate
+        document.getElementById('nearestAlternateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch(`${API_BASE}/nearest-alternate/`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                displayNearestAlternateResults(result);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        function displayNearestAlternateResults(data) {
+            const container = document.getElementById('nearestAlternateResults');
+            container.innerHTML = '';
+            
+            if (data.results && data.results.length > 0) {
+                data.results.forEach((result, idx) => {
+                    const card = `
+                        <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="text-xl font-bold">Option ${idx + 1}</h3>
+                                    <p class="text-gray-600">${result.airport.name} (${result.airport.iata_code})</p>
+                                    <p class="text-sm text-gray-500">${result.distance_to_destination_km.toFixed(1)} km from destination</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-2xl font-bold text-green-600">€${result.total_trip_cost_eur.toFixed(2)}</p>
+                                    <p class="text-sm text-gray-600">Total Cost</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 mt-4">
+                                <div>
+                                    <p class="text-sm text-gray-600">Flight Cost</p>
+                                    <p class="font-semibold">€${result.flight_cost_eur.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600">Ground Transport</p>
+                                    <p class="font-semibold">€${result.ground_cost_eur.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600">Total Time</p>
+                                    <p class="font-semibold">${Math.floor(result.total_trip_time_minutes / 60)}h ${result.total_trip_time_minutes % 60}m</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+            } else {
+                container.innerHTML = '<p class="text-gray-600">No results found</p>';
+            }
+        }
+
+        // Feature 2: Multi-Modal
+        document.getElementById('multiModalForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch(`${API_BASE}/multi-modal/`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                displayMultiModalResults(result);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        function displayMultiModalResults(data) {
+            const container = document.getElementById('multiModalResults');
+            container.innerHTML = '';
+            
+            if (data.connections && data.connections.length > 0) {
+                data.connections.forEach((conn, idx) => {
+                    let connectionTypeLabel;
+                    if (conn.type === 'direct') {
+                        connectionTypeLabel = 'Direct';
+                    } else if (conn.type === 'train_link') {
+                        connectionTypeLabel = 'Train Link';
+                    } else {
+                        connectionTypeLabel = 'Connection';
+                    }
+                    
+                    const card = `
+                        <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                                        ${connectionTypeLabel}
+                                    </span>
+                                    <p class="text-sm text-gray-600 mt-2">Quality Score: ${conn.connection_quality_score.toFixed(1)}/10</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-2xl font-bold text-green-600">€${conn.total_cost_eur.toFixed(2)}</p>
+                                    <p class="text-sm text-gray-600">${Math.floor(conn.total_time_minutes / 60)}h ${conn.total_time_minutes % 60}m</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+            } else {
+                container.innerHTML = '<p class="text-gray-600">No connections found</p>';
+            }
+        }
+
+        // Feature 3: Vibe Search
+        document.getElementById('vibeSearchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch(`${API_BASE}/vibe-search/`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                displayVibeSearchResults(result);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        function displayVibeSearchResults(data) {
+            const container = document.getElementById('vibeSearchResults');
+            container.innerHTML = '';
+            
+            if (data.top_matches && data.top_matches.length > 0) {
+                data.top_matches.forEach((match, idx) => {
+                    const card = `
+                        <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 class="text-xl font-bold">Match ${idx + 1}</h3>
+                                    <p class="text-gray-600">Match Score: ${match.match_score.toFixed(1)}%</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-2xl font-bold text-green-600">€${match.total_trip_cost_eur}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+            } else {
+                container.innerHTML = '<p class="text-gray-600">No matches found</p>';
+            }
+        }
+
+        // Feature 4: Collaborative
+        document.getElementById('generateCodeBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_BASE}/collaborative/generate-code/`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const result = await response.json();
+                document.getElementById('syncCodeDisplay').innerHTML = `
+                    <p class="font-mono text-lg font-bold text-blue-600">${result.sync_code}</p>
+                    <p class="text-sm text-gray-600">${result.message}</p>
+                `;
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        document.getElementById('linkPartnerBtn').addEventListener('click', async () => {
+            const code = document.getElementById('partnerSyncCode').value;
+            if (!code) {
+                alert('Please enter a sync code');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/collaborative/link-partner/`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({sync_code: code})
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('Partner linked successfully!');
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        // Feature 5: Delay Check
+        document.getElementById('delayCheckForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const flightId = formData.get('flight_id');
+            
+            try {
+                const response = await fetch(`${API_BASE}/delay-prediction/?flight_id=${flightId}`);
+                const result = await response.json();
+                displayDelayResults(result);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        function displayDelayResults(data) {
+            const container = document.getElementById('delayCheckResults');
+            const pred = data.delay_prediction;
+            
+            let riskColor;
+            if (pred.delay_probability > 30) {
+                riskColor = 'red';
+            } else if (pred.delay_probability > 15) {
+                riskColor = 'yellow';
+            } else {
+                riskColor = 'green';
+            }
+            
+            container.innerHTML = `
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold mb-4">Delay Prediction</h3>
+                    <div class="space-y-2">
+                        <p><span class="font-semibold">Delay Probability:</span> 
+                            <span class="text-${riskColor}-600 font-bold">${pred.delay_probability.toFixed(1)}%</span>
+                        </p>
+                        <p><span class="font-semibold">Average Delay:</span> ${pred.avg_delay_minutes} minutes</p>
+                        <p><span class="font-semibold">Sample Size:</span> ${pred.sample_size} flights</p>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

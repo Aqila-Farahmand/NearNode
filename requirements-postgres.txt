@@ -1,0 +1,7 @@
+# Optional PostgreSQL support
+# Install this only if you plan to use PostgreSQL instead of SQLite
+# Note: psycopg2-binary may not have Python 3.13 wheels yet
+# If installation fails, you may need to install PostgreSQL development libraries:
+# macOS: brew install postgresql
+# Ubuntu: sudo apt-get install libpq-dev
+psycopg2-binary>=2.9.9
