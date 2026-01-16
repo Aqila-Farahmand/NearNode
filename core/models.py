@@ -164,8 +164,47 @@ class FlightConnection(models.Model):
 
 class UserProfile(models.Model):
     """Extended user profile"""
+    CURRENCY_CHOICES = [
+        ('USD', 'US Dollar ($)'),
+        ('EUR', 'Euro (€)'),
+        ('GBP', 'British Pound (£)'),
+        ('JPY', 'Japanese Yen (¥)'),
+        ('CAD', 'Canadian Dollar (C$)'),
+        ('AUD', 'Australian Dollar (A$)'),
+        ('CHF', 'Swiss Franc (CHF)'),
+        ('CNY', 'Chinese Yuan (¥)'),
+    ]
+
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name='profile')
+
+    # Personal Information
+    first_name = models.CharField(max_length=100, blank=True)
+    last_name = models.CharField(max_length=100, blank=True)
+    email = models.EmailField(blank=True)
+    phone_number = models.CharField(max_length=20, blank=True)
+
+    # Location & Preferences
+    home_airport = models.ForeignKey(
+        Airport,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='home_users',
+        help_text="User's home airport"
+    )
+    currency = models.CharField(
+        max_length=3,
+        choices=CURRENCY_CHOICES,
+        default='EUR',
+        help_text="Preferred currency for price display"
+    )
+    location_latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True)
+    location_longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True)
+
+    # Collaborative Features
     partner = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -185,6 +224,12 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s Profile"
+
+    def get_full_name(self):
+        """Get user's full name"""
+        if self.first_name and self.last_name:
+            return f"{self.first_name} {self.last_name}"
+        return self.user.username
 
 
 class TripSearch(models.Model):
@@ -221,7 +266,7 @@ class TripSearch(models.Model):
 class TripOption(models.Model):
     """Individual trip option result from a search"""
     search = models.ForeignKey(
-        TripSearch, on_delete=models.CASCADE, related_name='options')
+        TripSearch, on_delete=models.CASCADE, related_name='options', null=True, blank=True)
     flight_connection = models.ForeignKey(
         FlightConnection, on_delete=models.CASCADE, null=True, blank=True)
     flight = models.ForeignKey(
@@ -240,13 +285,22 @@ class TripOption(models.Model):
         max_digits=5, decimal_places=2, default=0.0)
     rank = models.IntegerField(default=0)
 
+    # Saved trips
+    saved_by = models.ManyToManyField(
+        User,
+        related_name='saved_trips',
+        blank=True,
+        help_text="Users who saved this trip"
+    )
+    saved_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['rank', 'total_trip_cost_eur']
 
     def __str__(self):
-        return f"Option {self.rank} for search {self.search.id}"
+        return f"Option {self.rank} for search {self.search.id if self.search else 'unsaved'}"
 
 
 class CollaborativeVote(models.Model):

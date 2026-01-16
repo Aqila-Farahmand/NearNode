@@ -29,9 +29,21 @@
                     <h1 class="text-2xl font-bold">NearNode</h1>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <button id="profileBtn" class="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30">
-                        <i class="fas fa-user mr-2"></i>Profile
-                    </button>
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'profile' %}" class="text-white text-sm hover:underline">
+                            <i class="fas fa-user mr-1"></i>{{ user.username }}
+                        </a>
+                        <a href="{% url 'logout' %}" class="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 text-white">
+                            <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                        </a>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 text-white">
+                            <i class="fas fa-sign-in-alt mr-2"></i>Login
+                        </a>
+                        <a href="{% url 'signup' %}" class="px-4 py-2 bg-white bg-opacity-30 rounded-lg hover:bg-opacity-40 text-white font-semibold">
+                            <i class="fas fa-user-plus mr-2"></i>Sign Up
+                        </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -228,7 +240,11 @@
             try {
                 const response = await fetch(`${API_BASE}/nearest-alternate/`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    credentials: 'include',
                     body: JSON.stringify(data)
                 });
                 const result = await response.json();
@@ -237,13 +253,54 @@
                 alert('Error: ' + error.message);
             }
         });
+        
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (const cookie of cookies) {
+                    const trimmedCookie = cookie.trim();
+                    if (trimmedCookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(trimmedCookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
 
         function displayNearestAlternateResults(data) {
             const container = document.getElementById('nearestAlternateResults');
             container.innerHTML = '';
             
+            const currency = data.currency || 'EUR';
+            
+            // Determine currency symbol
+            let currencySymbol;
+            if (currency === 'EUR') {
+                currencySymbol = '€';
+            } else if (currency === 'USD') {
+                currencySymbol = '$';
+            } else if (currency === 'GBP') {
+                currencySymbol = '£';
+            } else {
+                currencySymbol = currency;
+            }
+            
+            // Calculate exchange rate
+            let exchangeRate = 1;
+            if (data.currency !== 'EUR') {
+                if (data.results && data.results[0] && data.results[0].total_trip_cost_converted) {
+                    exchangeRate = data.results[0].total_trip_cost_converted / data.results[0].total_trip_cost_eur;
+                }
+            }
+            
             if (data.results && data.results.length > 0) {
                 data.results.forEach((result, idx) => {
+                    const totalCost = result.total_trip_cost_converted || (result.total_trip_cost_eur * exchangeRate);
+                    const flightCost = result.flight_cost_eur * exchangeRate;
+                    const groundCost = result.ground_cost_eur * exchangeRate;
+                    
                     const card = `
                         <div class="bg-white rounded-lg shadow-md p-6 card-hover">
                             <div class="flex justify-between items-start mb-4">
@@ -253,22 +310,28 @@
                                     <p class="text-sm text-gray-500">${result.distance_to_destination_km.toFixed(1)} km from destination</p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-2xl font-bold text-green-600">€${result.total_trip_cost_eur.toFixed(2)}</p>
+                                    <p class="text-2xl font-bold text-green-600">${currencySymbol}${totalCost.toFixed(2)}</p>
                                     <p class="text-sm text-gray-600">Total Cost</p>
                                 </div>
                             </div>
                             <div class="grid grid-cols-2 gap-4 mt-4">
                                 <div>
                                     <p class="text-sm text-gray-600">Flight Cost</p>
-                                    <p class="font-semibold">€${result.flight_cost_eur.toFixed(2)}</p>
+                                    <p class="font-semibold">${currencySymbol}${flightCost.toFixed(2)}</p>
                                 </div>
                                 <div>
                                     <p class="text-sm text-gray-600">Ground Transport</p>
-                                    <p class="font-semibold">€${result.ground_cost_eur.toFixed(2)}</p>
+                                    <p class="font-semibold">${currencySymbol}${groundCost.toFixed(2)}</p>
                                 </div>
                                 <div>
                                     <p class="text-sm text-gray-600">Total Time</p>
                                     <p class="font-semibold">${Math.floor(result.total_trip_time_minutes / 60)}h ${result.total_trip_time_minutes % 60}m</p>
+                                </div>
+                                <div>
+                                    <button onclick="saveTrip(${result.flight_id || null}, null)" 
+                                        class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
+                                        <i class="fas fa-bookmark mr-1"></i>Save Trip
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -277,6 +340,44 @@
                 });
             } else {
                 container.innerHTML = '<p class="text-gray-600">No results found</p>';
+            }
+        }
+        
+        async function saveTrip(flightId, connectionId) {
+            if (!flightId && !connectionId) {
+                alert('Please login to save trips');
+                globalThis.location.href = '/login/';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/save-trip/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        flight_id: flightId,
+                        connection_id: connectionId
+                    })
+                });
+                
+                if (response.status === 403) {
+                    alert('Please login to save trips');
+                    globalThis.location.href = '/login/';
+                    return;
+                }
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('Trip saved successfully! View it in your profile.');
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to save trip'));
+                }
+            } catch (error) {
+                alert('Error saving trip: ' + error.message);
             }
         }
 

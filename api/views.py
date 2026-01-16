@@ -105,14 +105,34 @@ def nearest_alternate_search(request):
         radius_km
     )
 
+    # Get user's currency preference if authenticated
+    currency = 'EUR'
+    if request.user.is_authenticated:
+        try:
+            profile = request.user.profile
+            currency = profile.currency
+        except (UserProfile.DoesNotExist, AttributeError):
+            pass
+
+    # Convert prices to user's currency (simplified - in production, use real exchange rates)
+    exchange_rates = {
+        'USD': 1.10, 'EUR': 1.0, 'GBP': 0.85, 'JPY': 160.0,
+        'CAD': 1.50, 'AUD': 1.65, 'CHF': 0.95, 'CNY': 7.80
+    }
+    rate = exchange_rates.get(currency, 1.0)
+
     serialized_results = []
     for result in results:
+        flight_data = FlightSerializer(result['flight']).data
         serialized_results.append({
-            'flight': FlightSerializer(result['flight']).data,
+            'flight': flight_data,
+            'flight_id': flight_data.get('id'),  # Add flight ID for saving
             'ground_transport': GroundTransportSerializer(result['ground_transport']).data if result['ground_transport'] else None,
             'airport': AirportSerializer(result['airport']).data,
             'distance_to_destination_km': result['distance_to_destination_km'],
             'total_trip_cost_eur': float(result['total_cost_eur']),
+            'total_trip_cost_converted': float(result['total_cost_eur']) * rate,
+            'currency': currency,
             'total_trip_time_minutes': result['total_time_minutes'],
             'flight_cost_eur': float(result['flight_cost']),
             'ground_cost_eur': float(result['ground_cost']),
@@ -120,7 +140,8 @@ def nearest_alternate_search(request):
 
     return Response({
         'results': serialized_results,
-        'count': len(serialized_results)
+        'count': len(serialized_results),
+        'currency': currency
     })
 
 
@@ -186,6 +207,48 @@ def multi_modal_search(request):
     })
 
 
+def _search_vibe_for_anonymous(parsed_query):
+    """Helper function to search vibe for anonymous users"""
+    matching_airports = AIVibeSearchService._find_matching_airports(
+        parsed_query)
+    options = []
+
+    # Find origin airport if specified
+    origin_airport = None
+    if parsed_query.get('origin_city'):
+        origin_airport = Airport.objects.filter(
+            city__icontains=parsed_query['origin_city']).first()
+
+    if not origin_airport:
+        return options
+
+    # Search flights for matching destinations
+    max_price = parsed_query.get('max_price_eur', 99999) or 99999
+    max_duration = (parsed_query.get('max_duration_hours', 24) or 24) * 60
+
+    for dest_airport in matching_airports[:10]:
+        flights = Flight.objects.filter(
+            origin_airport=origin_airport,
+            destination_airport=dest_airport,
+            price_eur__lte=max_price,
+            duration_minutes__lte=max_duration
+        )[:3]
+
+        for flight in flights:
+            match_score = AIVibeSearchService._calculate_match_score(
+                flight, parsed_query)
+            options.append({
+                'flight': FlightSerializer(flight).data,
+                'total_trip_cost_eur': float(flight.price_eur),
+                'total_trip_time_minutes': flight.duration_minutes,
+                'match_score': match_score
+            })
+
+    # Sort by match score and return top 3
+    options.sort(key=lambda x: x['match_score'], reverse=True)
+    return options[:3]
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def vibe_search(request):
@@ -209,44 +272,8 @@ def vibe_search(request):
             parsed_query, request.user)
         search_data = TripSearchSerializer(search).data
     else:
-        # For anonymous users, just parse and search without saving
-        from core.models import Airport, Flight, TripOption
-        matching_airports = AIVibeSearchService._find_matching_airports(
-            parsed_query)
-        options = []
+        options = _search_vibe_for_anonymous(parsed_query)
         search_data = None
-
-        # Create temporary options without saving to database
-        origin_airport = None
-        if parsed_query.get('origin_city'):
-            from core.models import Airport
-            origin_airport = Airport.objects.filter(
-                city__icontains=parsed_query['origin_city']).first()
-
-        if origin_airport:
-            for dest_airport in matching_airports[:10]:
-                flights = Flight.objects.filter(
-                    origin_airport=origin_airport,
-                    destination_airport=dest_airport,
-                    price_eur__lte=parsed_query.get(
-                        'max_price_eur', 99999) or 99999,
-                    duration_minutes__lte=(parsed_query.get(
-                        'max_duration_hours', 24) or 24) * 60
-                )[:3]
-
-                for flight in flights:
-                    match_score = AIVibeSearchService._calculate_match_score(
-                        flight, parsed_query)
-                    options.append({
-                        'flight': FlightSerializer(flight).data,
-                        'total_trip_cost_eur': float(flight.price_eur),
-                        'total_trip_time_minutes': flight.duration_minutes,
-                        'match_score': match_score
-                    })
-
-        # Sort by match score
-        options.sort(key=lambda x: x['match_score'], reverse=True)
-        options = options[:3]
 
     return Response({
         'search': search_data,
