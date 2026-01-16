@@ -26,5 +26,10 @@ def create_user_profile(sender, instance, created, **kwargs):
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
     """Update UserProfile when User is saved"""
-    if hasattr(instance, 'profile'):
-        instance.profile.save()
+    try:
+        if hasattr(instance, 'profile'):
+            instance.profile.save()
+    except Exception:
+        # Ignore errors if profile doesn't exist or database schema is outdated
+        # This can happen during migrations
+        pass

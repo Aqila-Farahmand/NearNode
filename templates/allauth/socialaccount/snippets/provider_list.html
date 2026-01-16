@@ -1,0 +1,38 @@
+{% load socialaccount %}
+
+{% get_providers as socialaccount_providers %}
+
+<ul class="list-none space-y-3">
+{% for provider in socialaccount_providers %}
+    {% if provider.id == "openid" %}
+        {% for brand in provider.get_brands %}
+            <li>
+                <a title="{{brand.name}}" 
+                   class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors mb-3"
+                   href="{% provider_login_url provider.id openid=brand.openid_url process=process %}"
+                >
+                    <i class="fab fa-google text-red-500 mr-2"></i>
+                    {{brand.name}}
+                </a>
+            </li>
+        {% endfor %}
+    {% endif %}
+    <li>
+        <a title="{{provider.name}}" 
+           class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors mb-3"
+           href="{% provider_login_url provider.id process=process scope=scope auth_params=auth_params %}"
+        >
+            {% if provider.id == "google" %}
+                <i class="fab fa-google text-red-500 mr-2"></i>
+            {% elif provider.id == "facebook" %}
+                <i class="fab fa-facebook text-blue-600 mr-2"></i>
+            {% elif provider.id == "github" %}
+                <i class="fab fa-github text-gray-800 mr-2"></i>
+            {% else %}
+                <i class="fas fa-sign-in-alt mr-2"></i>
+            {% endif %}
+            Sign in with {{provider.name}}
+        </a>
+    </li>
+{% endfor %}
+</ul>
