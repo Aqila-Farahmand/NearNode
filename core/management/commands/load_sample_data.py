@@ -49,20 +49,22 @@ class Command(BaseCommand):
 
         airports = {}
         for data in airports_data:
-            airport, created = Airport.objects.get_or_create(
-                iata_code=data['iata'],
-                defaults={
-                    'icao_code': data['icao'],
-                    'name': data['name'],
-                    'city': data['city'],
-                    'country': data['country'],
-                    'latitude': data['lat'],
-                    'longitude': data['lon'],
-                    'has_lounge': data['lounge'],
-                    'has_sleeping_pods': data['pods'],
-                    'layover_quality_score': data['score'],
-                    'city_access_time': 30 if data['city'] != 'London' else 45,
-                }
+            # Use icao_code as lookup so we don't duplicate airports already loaded by load_world_airports
+            defaults = {
+                'iata_code': data['iata'],
+                'name': data['name'],
+                'city': data['city'],
+                'country': data['country'],
+                'latitude': data['lat'],
+                'longitude': data['lon'],
+                'has_lounge': data['lounge'],
+                'has_sleeping_pods': data['pods'],
+                'layover_quality_score': data['score'],
+                'city_access_time': 30 if data['city'] != 'London' else 45,
+            }
+            airport, created = Airport.objects.update_or_create(
+                icao_code=data['icao'],
+                defaults=defaults,
             )
             airports[data['iata']] = airport
             if created:
@@ -107,22 +109,35 @@ class Command(BaseCommand):
                     f'Created transport: {transport.name}'))
 
     def _create_flights(self, airports, base_date):
-        """Create sample flights."""
-        flights_data = [
+        """Create sample flights for the next 14 days so any date in that range returns results."""
+        day_offsets = range(1, 15)  # next 14 days from base_date
+        base_flights = [
             {'number': 'BA456', 'airline': self.BRITISH_AIRWAYS, 'origin': 'MIL', 'dest': 'LHR',
-             'departure': base_date + timedelta(days=7), 'duration': 120, 'price': 350.00, 'delay_prob': 20},
+             'hours': 0, 'duration': 120, 'price': 350.00, 'delay_prob': 20},
             {'number': 'FR123', 'airline': 'Ryanair', 'origin': 'MIL', 'dest': 'STN',
-             'departure': base_date + timedelta(days=7, hours=2), 'duration': 135, 'price': 120.00, 'delay_prob': 25},
+             'hours': 2, 'duration': 135, 'price': 120.00, 'delay_prob': 25},
             {'number': 'BA789', 'airline': self.BRITISH_AIRWAYS, 'origin': 'MIL', 'dest': 'SOU',
-             'departure': base_date + timedelta(days=7, hours=4), 'duration': 150, 'price': 180.00, 'delay_prob': 15},
+             'hours': 4, 'duration': 150, 'price': 180.00, 'delay_prob': 15},
             {'number': 'SN456', 'airline': 'Brussels Airlines', 'origin': 'MIL', 'dest': 'BRU',
-             'departure': base_date + timedelta(days=7), 'duration': 90, 'price': 150.00, 'delay_prob': 18},
+             'hours': 0, 'duration': 90, 'price': 150.00, 'delay_prob': 18},
             {'number': 'KL789', 'airline': 'KLM', 'origin': 'BRU', 'dest': 'AMS',
-             'departure': base_date + timedelta(days=7, hours=3), 'duration': 60, 'price': 80.00, 'delay_prob': 12},
+             'hours': 3, 'duration': 60, 'price': 80.00, 'delay_prob': 12},
             {'number': 'AF234', 'airline': 'Air France', 'origin': 'MIL', 'dest': 'CDG',
-             'departure': base_date + timedelta(days=7, hours=1), 'duration': 100, 'price': 200.00, 'delay_prob': 22},
+             'hours': 1, 'duration': 100, 'price': 200.00, 'delay_prob': 22},
         ]
-
+        flights_data = []
+        for day_offset in day_offsets:
+            for b in base_flights:
+                flights_data.append({
+                    'number': b['number'],
+                    'airline': b['airline'],
+                    'origin': b['origin'],
+                    'dest': b['dest'],
+                    'departure': base_date + timedelta(days=day_offset, hours=b['hours']),
+                    'duration': b['duration'],
+                    'price': b['price'],
+                    'delay_prob': b['delay_prob'],
+                })
         for data in flights_data:
             origin = airports[data['origin']]
             dest = airports[data['dest']]

@@ -183,6 +183,11 @@ class UserProfile(models.Model):
     last_name = models.CharField(max_length=100, blank=True)
     email = models.EmailField(blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
+    country_code = models.CharField(
+        max_length=2,
+        blank=True,
+        help_text="ISO 3166-1 alpha-2 country code (e.g. US, GB)"
+    )
 
     # Location & Preferences
     home_airport = models.ForeignKey(

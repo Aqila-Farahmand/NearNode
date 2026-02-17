@@ -19,8 +19,40 @@ from .serializers import (
 )
 from .services import (
     NearestAlternateService, MultiModalConnectionService,
-    AIVibeSearchService, CollaborativeService, DelayPredictionService
+    AIVibeSearchService, CollaborativeService, DelayPredictionService,
+    find_best_alternates_real,
 )
+from . import amadeus_client
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def nearest_airport(request):
+    """
+    GET ?lat=...&lon=... — returns the airport nearest to the given coordinates.
+    Used by profile "Use current location" to set home airport.
+    """
+    lat = request.query_params.get('lat')
+    lon = request.query_params.get('lon')
+    if not lat or not lon:
+        return Response(
+            {'error': 'Query parameters lat and lon are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    try:
+        lat_f = float(lat)
+        lon_f = float(lon)
+    except ValueError:
+        return Response({'error': 'lat and lon must be numbers'}, status=status.HTTP_400_BAD_REQUEST)
+    airports = list(Airport.objects.all())
+    if not airports:
+        return Response({'error': 'No airports in database'}, status=status.HTTP_404_NOT_FOUND)
+    nearest = min(airports, key=lambda a: a.distance_to(lat_f, lon_f))
+    return Response({
+        'airport': AirportSerializer(nearest).data,
+        'iata_code': nearest.iata_code,
+        'distance_km': round(nearest.distance_to(lat_f, lon_f), 2),
+    })
 
 
 class AirportViewSet(viewsets.ReadOnlyModelViewSet):
@@ -98,12 +130,20 @@ def nearest_alternate_search(request):
     except ValueError:
         return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
 
-    results = NearestAlternateService.find_best_alternates(
-        origin_airport_code,
-        final_destination_address,
-        date,
-        radius_km
-    )
+    if amadeus_client.is_configured():
+        results = find_best_alternates_real(
+            origin_airport_code,
+            final_destination_address,
+            date,
+            radius_km,
+        )
+    else:
+        results = NearestAlternateService.find_best_alternates(
+            origin_airport_code,
+            final_destination_address,
+            date,
+            radius_km,
+        )
 
     # Get user's currency preference if authenticated
     currency = 'EUR'
@@ -121,28 +161,74 @@ def nearest_alternate_search(request):
     }
     rate = exchange_rates.get(currency, 1.0)
 
-    serialized_results = []
-    for result in results:
-        flight_data = FlightSerializer(result['flight']).data
-        serialized_results.append({
-            'flight': flight_data,
-            'flight_id': flight_data.get('id'),  # Add flight ID for saving
-            'ground_transport': GroundTransportSerializer(result['ground_transport']).data if result['ground_transport'] else None,
-            'airport': AirportSerializer(result['airport']).data,
-            'distance_to_destination_km': result['distance_to_destination_km'],
-            'total_trip_cost_eur': float(result['total_cost_eur']),
-            'total_trip_cost_converted': float(result['total_cost_eur']) * rate,
-            'currency': currency,
-            'total_trip_time_minutes': result['total_time_minutes'],
-            'flight_cost_eur': float(result['flight_cost']),
-            'ground_cost_eur': float(result['ground_cost']),
-        })
+    use_real_api = amadeus_client.is_configured()
+    serialized_results = [
+        _serialize_one_alternate(result, rate, currency, use_real_api)
+        for result in results
+    ]
 
-    return Response({
+    payload = {
         'results': serialized_results,
         'count': len(serialized_results),
         'currency': currency
-    })
+    }
+    if len(serialized_results) == 0:
+        payload['hint'] = _nearest_alternate_empty_hint(
+            origin_airport_code, final_destination_address, date_str, date
+        )
+    return Response(payload)
+
+
+def _serialize_one_alternate(result, rate, currency, use_real_api):
+    """Build one serialized result for nearest-alternate (DB or real API)."""
+    if use_real_api and isinstance(result.get('flight'), dict):
+        flight_data = result['flight']
+        flight_id = result.get('flight_id')
+        ground = result.get('ground_transport')
+    else:
+        flight_data = FlightSerializer(result['flight']).data
+        flight_id = flight_data.get('id')
+        ground = result.get('ground_transport')
+    return {
+        'flight': flight_data,
+        'flight_id': flight_id,
+        'ground_transport': GroundTransportSerializer(ground).data if ground else None,
+        'airport': AirportSerializer(result['airport']).data,
+        'distance_to_destination_km': result['distance_to_destination_km'],
+        'total_trip_cost_eur': float(result['total_cost_eur']),
+        'total_trip_cost_converted': float(result['total_cost_eur']) * rate,
+        'currency': currency,
+        'total_trip_time_minutes': result['total_time_minutes'],
+        'flight_cost_eur': float(result['flight_cost']),
+        'ground_cost_eur': float(result.get('ground_cost', 0)),
+    }
+
+
+def _nearest_alternate_empty_hint(origin_airport_code, final_destination_address, date_str, date):
+    """Return a specific hint when nearest-alternate search returns no results."""
+    origin_code = (origin_airport_code or '').strip().upper()
+    dest_lat, dest_lon = NearestAlternateService._resolve_destination_coords(
+        final_destination_address
+    )
+    if not Airport.objects.filter(iata_code=origin_code).exists():
+        return (
+            'Origin airport "{}" not in database. Run: python manage.py load_sample_data '
+            'or python manage.py load_world_airports.'.format(origin_code or '')
+        )
+    if not dest_lat or not dest_lon:
+        return (
+            'Could not find destination. Use a city name (e.g. London), '
+            'full address, or 3-letter airport code (e.g. LHR).'
+        )
+    if not Flight.objects.filter(departure_time__date=date).exists():
+        return (
+            'No flights in database for {}. Run: python manage.py load_sample_data — '
+            'sample flights are for the next 14 days from when you run it.'.format(date_str)
+        )
+    return (
+        'No flights from {} to airports near your destination on this date. '
+        'Try a larger radius or a different date.'.format(origin_code)
+    )
 
 
 @api_view(['POST'])

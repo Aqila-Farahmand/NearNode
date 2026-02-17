@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 from core.models import UserProfile, Airport, TripOption, Flight, FlightConnection
+from core.countries import COUNTRY_CHOICES
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from decimal import Decimal
@@ -106,6 +107,8 @@ def _update_profile_from_post(profile, user, post_data, request_obj):
     profile.email = post_data.get('email', '')
     profile.phone_number = post_data.get('phone_number', '')
     profile.currency = post_data.get('currency', 'EUR')
+    raw = (post_data.get('country_code') or '').strip().upper()
+    profile.country_code = raw[:2] if len(raw) >= 2 else ''
 
     # Update user's email if provided
     if profile.email:
@@ -152,13 +155,14 @@ def profile_view(request):
     saved_trips = TripOption.objects.filter(
         saved_by=request.user).order_by('-saved_at', '-created_at')
 
-    # Get all airports for dropdown
-    airports = Airport.objects.all().order_by('name')
+    # Get all airports for dropdown (world list; order by country, city, name)
+    airports = Airport.objects.all().order_by('country', 'city', 'name')
 
     context = {
         'profile': profile,
         'saved_trips': saved_trips,
         'airports': airports,
+        'country_choices': COUNTRY_CHOICES,
     }
     return render(request, 'core/profile.html', context)
 

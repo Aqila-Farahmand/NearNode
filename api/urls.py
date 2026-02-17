@@ -5,7 +5,8 @@ from .views import (
     nearest_alternate_search, multi_modal_search, vibe_search,
     generate_partner_sync_code, link_partner, vote_on_trip,
     get_perfect_matches, predict_delay, check_self_transfer_insurance,
-    get_user_profile, update_user_profile
+    get_user_profile, update_user_profile,
+    nearest_airport,
 )
 
 router = DefaultRouter()
@@ -39,4 +40,5 @@ urlpatterns = [
     # User Profile
     path('profile/', get_user_profile, name='user-profile'),
     path('profile/update/', update_user_profile, name='update-profile'),
+    path('nearest-airport/', nearest_airport, name='nearest-airport'),
 ]

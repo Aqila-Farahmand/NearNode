@@ -248,9 +248,13 @@
                     body: JSON.stringify(data)
                 });
                 const result = await response.json();
+                if (!response.ok) {
+                    displayNearestAlternateResults({ error: result.error || response.statusText, results: [] });
+                    return;
+                }
                 displayNearestAlternateResults(result);
             } catch (error) {
-                alert('Error: ' + error.message);
+                displayNearestAlternateResults({ error: error.message, results: [] });
             }
         });
         
@@ -269,77 +273,72 @@
             return cookieValue;
         }
 
+        function getCurrencySymbol(currency) {
+            const symbols = { EUR: '€', USD: '$', GBP: '£' };
+            return symbols[currency] || currency;
+        }
+
+        function buildNearestAlternateCard(result, idx, currencySymbol, exchangeRate) {
+            const totalCost = result.total_trip_cost_converted || (result.total_trip_cost_eur * exchangeRate);
+            const flightCost = (result.flight_cost_eur || 0) * exchangeRate;
+            const groundCost = (result.ground_cost_eur == null ? 0 : result.ground_cost_eur) * exchangeRate;
+            const timeH = Math.floor(result.total_trip_time_minutes / 60);
+            const timeM = result.total_trip_time_minutes % 60;
+            return `
+                <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold">Option ${idx + 1}</h3>
+                            <p class="text-gray-600">${result.airport.name} (${result.airport.iata_code})</p>
+                            <p class="text-sm text-gray-500">${result.distance_to_destination_km.toFixed(1)} km from destination</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold text-green-600">${currencySymbol}${totalCost.toFixed(2)}</p>
+                            <p class="text-sm text-gray-600">Total Cost</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <p class="text-sm text-gray-600">Flight Cost</p>
+                            <p class="font-semibold">${currencySymbol}${flightCost.toFixed(2)}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Ground Transport</p>
+                            <p class="font-semibold">${currencySymbol}${groundCost.toFixed(2)}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Total Time</p>
+                            <p class="font-semibold">${timeH}h ${timeM}m</p>
+                        </div>
+                        <div>
+                            <button onclick="saveTrip(${result.flight_id || null}, null)" 
+                                class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
+                                <i class="fas fa-bookmark mr-1"></i>Save Trip
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         function displayNearestAlternateResults(data) {
             const container = document.getElementById('nearestAlternateResults');
             container.innerHTML = '';
-            
+            if (data.error) {
+                container.innerHTML = '<p class="text-red-600">' + data.error + (data.hint ? ' ' + data.hint : '') + '</p>';
+                return;
+            }
             const currency = data.currency || 'EUR';
-            
-            // Determine currency symbol
-            let currencySymbol;
-            if (currency === 'EUR') {
-                currencySymbol = '€';
-            } else if (currency === 'USD') {
-                currencySymbol = '$';
-            } else if (currency === 'GBP') {
-                currencySymbol = '£';
-            } else {
-                currencySymbol = currency;
-            }
-            
-            // Calculate exchange rate
-            let exchangeRate = 1;
-            if (data.currency !== 'EUR') {
-                if (data.results && data.results[0] && data.results[0].total_trip_cost_converted) {
-                    exchangeRate = data.results[0].total_trip_cost_converted / data.results[0].total_trip_cost_eur;
-                }
-            }
-            
+            const currencySymbol = getCurrencySymbol(currency);
+            const first = data.results && data.results[0];
+            const needRate = data.currency === 'EUR' ? false : (first && first.total_trip_cost_converted);
+            const exchangeRate = needRate ? first.total_trip_cost_converted / first.total_trip_cost_eur : 1;
             if (data.results && data.results.length > 0) {
-                data.results.forEach((result, idx) => {
-                    const totalCost = result.total_trip_cost_converted || (result.total_trip_cost_eur * exchangeRate);
-                    const flightCost = result.flight_cost_eur * exchangeRate;
-                    const groundCost = result.ground_cost_eur * exchangeRate;
-                    
-                    const card = `
-                        <div class="bg-white rounded-lg shadow-md p-6 card-hover">
-                            <div class="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 class="text-xl font-bold">Option ${idx + 1}</h3>
-                                    <p class="text-gray-600">${result.airport.name} (${result.airport.iata_code})</p>
-                                    <p class="text-sm text-gray-500">${result.distance_to_destination_km.toFixed(1)} km from destination</p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-2xl font-bold text-green-600">${currencySymbol}${totalCost.toFixed(2)}</p>
-                                    <p class="text-sm text-gray-600">Total Cost</p>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4 mt-4">
-                                <div>
-                                    <p class="text-sm text-gray-600">Flight Cost</p>
-                                    <p class="font-semibold">${currencySymbol}${flightCost.toFixed(2)}</p>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-600">Ground Transport</p>
-                                    <p class="font-semibold">${currencySymbol}${groundCost.toFixed(2)}</p>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-600">Total Time</p>
-                                    <p class="font-semibold">${Math.floor(result.total_trip_time_minutes / 60)}h ${result.total_trip_time_minutes % 60}m</p>
-                                </div>
-                                <div>
-                                    <button onclick="saveTrip(${result.flight_id || null}, null)" 
-                                        class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
-                                        <i class="fas fa-bookmark mr-1"></i>Save Trip
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    container.innerHTML += card;
-                });
+                container.innerHTML = data.results.map((result, idx) =>
+                    buildNearestAlternateCard(result, idx, currencySymbol, exchangeRate)
+                ).join('');
             } else {
-                container.innerHTML = '<p class="text-gray-600">No results found</p>';
+                container.innerHTML = '<p class="text-gray-600">No results found.' + (data.hint ? ' ' + data.hint : '') + '</p>';
             }
         }
         
