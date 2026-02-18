@@ -92,10 +92,10 @@ Smart features for risk management.
    python manage.py createsuperuser
    ```
 
-7. **Load sample data (optional)**
+7. **Load world airports** (and set Amadeus in `.env` for real flight search — see Documents/REAL_DATA_SETUP.md)
 
    ```bash
-   python manage.py load_sample_data
+   python manage.py load_world_airports
    ```
 
 8. **Run development server**

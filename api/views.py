@@ -174,7 +174,7 @@ def nearest_alternate_search(request):
     }
     if len(serialized_results) == 0:
         payload['hint'] = _nearest_alternate_empty_hint(
-            origin_airport_code, final_destination_address, date_str, date
+            origin_airport_code, final_destination_address, date
         )
     return Response(payload)
 
@@ -189,10 +189,16 @@ def _serialize_one_alternate(result, rate, currency, use_real_api):
         flight_data = FlightSerializer(result['flight']).data
         flight_id = flight_data.get('id')
         ground = result.get('ground_transport')
+    if isinstance(ground, dict):
+        ground_data = ground
+    elif ground:
+        ground_data = GroundTransportSerializer(ground).data
+    else:
+        ground_data = None
     return {
         'flight': flight_data,
         'flight_id': flight_id,
-        'ground_transport': GroundTransportSerializer(ground).data if ground else None,
+        'ground_transport': ground_data,
         'airport': AirportSerializer(result['airport']).data,
         'distance_to_destination_km': result['distance_to_destination_km'],
         'total_trip_cost_eur': float(result['total_cost_eur']),
@@ -204,7 +210,7 @@ def _serialize_one_alternate(result, rate, currency, use_real_api):
     }
 
 
-def _nearest_alternate_empty_hint(origin_airport_code, final_destination_address, date_str, date):
+def _nearest_alternate_empty_hint(origin_airport_code, final_destination_address, date):
     """Return a specific hint when nearest-alternate search returns no results."""
     origin_code = (origin_airport_code or '').strip().upper()
     dest_lat, dest_lon = NearestAlternateService._resolve_destination_coords(
@@ -212,22 +218,25 @@ def _nearest_alternate_empty_hint(origin_airport_code, final_destination_address
     )
     if not Airport.objects.filter(iata_code=origin_code).exists():
         return (
-            'Origin airport "{}" not in database. Run: python manage.py load_sample_data '
-            'or python manage.py load_world_airports.'.format(origin_code or '')
+            'Origin airport "{}" not in database. Run: python manage.py load_world_airports.'.format(
+                origin_code or ''
+            )
         )
     if not dest_lat or not dest_lon:
         return (
             'Could not find destination. Use a city name (e.g. London), '
             'full address, or 3-letter airport code (e.g. LHR).'
         )
-    if not Flight.objects.filter(departure_time__date=date).exists():
+    # When Amadeus is configured, no results means API returned nothing for this route/date
+    from . import amadeus_client
+    if amadeus_client.is_configured():
         return (
-            'No flights in database for {}. Run: python manage.py load_sample_data — '
-            'sample flights are for the next 14 days from when you run it.'.format(date_str)
+            'No flights from {} to airports near your destination on this date. '
+            'Try a different date or larger radius.'.format(origin_code)
         )
     return (
-        'No flights from {} to airports near your destination on this date. '
-        'Try a larger radius or a different date.'.format(origin_code)
+        'Set AMADEUS_API_KEY and AMADEUS_API_SECRET in .env for real flight search. '
+        'See Documents/REAL_DATA_SETUP.md.'
     )
 
 

@@ -140,25 +140,44 @@ class NearestAlternateService:
 
 
 def _real_alternates_for_airport(origin_code, origin_airport, airport, distance, date_str,
-                                 final_destination_address):
-    """Get Amadeus offers for origin->airport and return list of result dicts."""
+                                 final_destination_address, dest_lat, dest_lon):
+    """Get Amadeus offers for origin->airport and return list of result dicts.
+    Ground transport: real from Navitia if configured, else from DB.
+    """
     from api.amadeus_client import search_flight_offers
+    from api import ground_transport_client as gtc
     offers = search_flight_offers(origin_code, airport.iata_code, date_str)
-    ground_transports = list(
-        GroundTransport.objects.filter(
-            from_airport=airport,
-            to_address=(final_destination_address or '').strip()
+    transport = None
+    ground_cost = 0.0
+    transport_duration = 0
+    if gtc.is_configured() and dest_lat is not None and dest_lon is not None:
+        journeys = gtc.get_journeys(
+            float(airport.latitude), float(airport.longitude),
+            dest_lat, dest_lon,
         )
-    )
-    if not ground_transports:
-        ground_transports = list(GroundTransport.objects.filter(from_airport=airport)[:1])
-    transport = ground_transports[0] if ground_transports else None
-    ground_cost = float(transport.cost_eur) if transport else 0
+        if journeys:
+            transport = journeys[0]
+            ground_cost = float(transport.get('cost_eur', 0))
+            transport_duration = int(transport.get('duration_minutes', 0))
+    if transport is None:
+        ground_transports = list(
+            GroundTransport.objects.filter(
+                from_airport=airport,
+                to_address=(final_destination_address or '').strip()
+            )
+        )
+        if not ground_transports:
+            ground_transports = list(
+                GroundTransport.objects.filter(from_airport=airport)[:1])
+        transport = ground_transports[0] if ground_transports else None
+        if transport:
+            ground_cost = float(transport.cost_eur)
+            transport_duration = transport.duration_minutes
     results = []
     for offer in offers:
         flight_cost = offer.get('price_eur', 0)
         duration = offer.get('duration_minutes', 0)
-        total_time = duration + (transport.duration_minutes if transport else 0)
+        total_time = duration + transport_duration
         flight_dict = {
             'id': offer.get('id'),
             'flight_number': offer.get('number', ''),
@@ -189,10 +208,12 @@ def find_best_alternates_real(origin_airport_code, final_destination_address, da
     ground_transport (model or None), and cost/time fields.
     """
     origin_code = (origin_airport_code or '').strip().upper()
-    dest_lat, dest_lon = NearestAlternateService._resolve_destination_coords(final_destination_address)
+    dest_lat, dest_lon = NearestAlternateService._resolve_destination_coords(
+        final_destination_address)
     if not dest_lat or not dest_lon:
         return []
-    nearby_airports = NearestAlternateService.find_airports_in_radius(dest_lat, dest_lon, radius_km)
+    nearby_airports = NearestAlternateService.find_airports_in_radius(
+        dest_lat, dest_lon, radius_km)
     try:
         origin_airport = Airport.objects.get(iata_code=origin_code)
     except Airport.DoesNotExist:
@@ -202,7 +223,7 @@ def find_best_alternates_real(origin_airport_code, final_destination_address, da
     for item in nearby_airports:
         results.extend(_real_alternates_for_airport(
             origin_code, origin_airport, item['airport'], item['distance_km'],
-            date_str, final_destination_address
+            date_str, final_destination_address, dest_lat, dest_lon
         ))
     results.sort(key=lambda x: (x['total_cost_eur'], x['total_time_minutes']))
     return results
