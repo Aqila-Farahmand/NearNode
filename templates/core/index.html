@@ -236,7 +236,8 @@
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
-            
+            const container = document.getElementById('nearestAlternateResults');
+            container.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Searching flights...</p>';
             try {
                 const response = await fetch(`${API_BASE}/nearest-alternate/`, {
                     method: 'POST',
@@ -408,7 +409,8 @@
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
-            
+            const container = document.getElementById('multiModalResults');
+            container.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Searching connections...</p>';
             try {
                 const response = await fetch(`${API_BASE}/multi-modal/`, {
                     method: 'POST',
@@ -418,7 +420,7 @@
                 const result = await response.json();
                 displayMultiModalResults(result);
             } catch (error) {
-                alert('Error: ' + error.message);
+                document.getElementById('multiModalResults').innerHTML = '<p class="text-red-600">Error: ' + error.message + '</p>';
             }
         });
 
@@ -465,43 +467,106 @@
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
-            
+            const resultsEl = document.getElementById('vibeSearchResults');
+            resultsEl.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Searching...</p>';
             try {
                 const response = await fetch(`${API_BASE}/vibe-search/`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
+                    credentials: 'include',
                     body: JSON.stringify(data)
                 });
                 const result = await response.json();
+                if (result.error) {
+                    resultsEl.innerHTML = '<p class="text-red-600">' + (result.error || 'Request failed') + '</p>';
+                    return;
+                }
                 displayVibeSearchResults(result);
             } catch (error) {
-                alert('Error: ' + error.message);
+                resultsEl.innerHTML = '<p class="text-red-600">Error: ' + error.message + '</p>';
             }
         });
+
+        function formatVibeParsedQuery(pq) {
+            if (!pq) return '';
+            const parts = [];
+            if (pq.origin_city) parts.push('From ' + pq.origin_city);
+            if (pq.destination_type) parts.push('Type: ' + pq.destination_type);
+            if (pq.max_price_eur) parts.push('Budget €' + pq.max_price_eur);
+            if (pq.max_duration_hours) parts.push('Up to ' + pq.max_duration_hours + 'h flight');
+            if (pq.weather_preference) parts.push('Weather: ' + pq.weather_preference);
+            return parts.length ? parts.join(' · ') : 'No filters extracted';
+        }
+
+        function getVibeFlightMinutes(match) {
+            if (match.total_trip_time_minutes != null) return match.total_trip_time_minutes;
+            const f = match.flight;
+            if (f && f.duration_minutes != null) return f.duration_minutes;
+            return 0;
+        }
+
+        function getVibeFlightId(flight) {
+            if (typeof flight.id === 'number') return flight.id;
+            if (typeof flight.id === 'string' && flight.id !== '') return flight.id;
+            return null;
+        }
+
+        function hasValue(x) {
+            return x !== undefined && x !== null;
+        }
+
+        function buildVibeMatchCard(match, idx) {
+            const flight = match.flight || {};
+            const origin = (flight.origin_airport && flight.origin_airport.iata_code) || '—';
+            const dest = (flight.destination_airport && flight.destination_airport.iata_code) || '—';
+            const score = hasValue(match.match_score) ? Number(match.match_score).toFixed(1) : '—';
+            const costRaw = match.total_trip_cost_eur;
+            const cost = hasValue(costRaw) ? '€' + Number(costRaw).toFixed(2) : '—';
+            const minutes = getVibeFlightMinutes(match);
+            const hasDuration = minutes > 0;
+            const timeStr = hasDuration ? (Math.floor(minutes / 60) + 'h ' + (minutes % 60) + 'm') : '—';
+            const dep = flight.departure_time ? new Date(flight.departure_time).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '';
+            const arr = flight.arrival_time ? new Date(flight.arrival_time).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '';
+            const flightId = getVibeFlightId(flight);
+            const airlinePart = flight.flight_number ? ' ' + flight.flight_number : '';
+            const airlineLine = flight.airline ? '<p class="text-sm text-gray-500">' + flight.airline + airlinePart + '</p>' : '';
+            const durationLine = hasDuration ? '<p>Duration: ' + timeStr + '</p>' : '';
+            const saveBtn = flightId
+                ? '<div><button onclick="saveTrip(' + flightId + ', null)" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"><i class="fas fa-bookmark mr-1"></i>Save Trip</button></div>'
+                : '';
+            return '<div class="bg-white rounded-lg shadow-md p-6 card-hover">' +
+                '<div class="flex justify-between items-start mb-3">' +
+                '<div><h3 class="text-xl font-bold">Match ' + (idx + 1) + '</h3>' +
+                '<p class="text-gray-600">' + origin + ' → ' + dest + '</p>' + airlineLine + '</div>' +
+                '<div class="text-right"><p class="text-2xl font-bold text-green-600">' + cost + '</p>' +
+                '<p class="text-sm text-gray-500">Match: ' + score + '%</p></div></div>' +
+                '<div class="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3">' + durationLine +
+                (dep ? '<p>Dep: ' + dep + '</p>' : '') + (arr ? '<p>Arr: ' + arr + '</p>' : '') + '</div>' + saveBtn + '</div>';
+        }
 
         function displayVibeSearchResults(data) {
             const container = document.getElementById('vibeSearchResults');
             container.innerHTML = '';
-            
-            if (data.top_matches && data.top_matches.length > 0) {
-                data.top_matches.forEach((match, idx) => {
-                    const card = `
-                        <div class="bg-white rounded-lg shadow-md p-6 card-hover">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <h3 class="text-xl font-bold">Match ${idx + 1}</h3>
-                                    <p class="text-gray-600">Match Score: ${match.match_score.toFixed(1)}%</p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-2xl font-bold text-green-600">€${match.total_trip_cost_eur}</p>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    container.innerHTML += card;
+
+            const pq = data.parsed_query || {};
+            const hasConfidence = data.ai_confidence != null;
+            const confidence = hasConfidence ? (Number(data.ai_confidence) * 100).toFixed(0) + '%' : '';
+            const summary = formatVibeParsedQuery(pq);
+            const hasSummary = Boolean(summary || confidence);
+            if (hasSummary) {
+                const confLine = confidence ? '<p class="text-xs text-gray-500 mt-2">AI confidence: ' + confidence + '</p>' : '';
+                container.innerHTML = '<div class="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">' +
+                    '<p class="font-medium text-gray-800">What we understood</p>' +
+                    '<p class="text-gray-600 text-sm mt-1">' + summary + '</p>' + confLine + '</div>';
+            }
+
+            const matches = data.top_matches || [];
+            if (matches.length > 0) {
+                matches.forEach((match, idx) => {
+                    container.innerHTML += buildVibeMatchCard(match, idx);
                 });
             } else {
-                container.innerHTML = '<p class="text-gray-600">No matches found</p>';
+                container.innerHTML += '<p class="text-gray-600">No matches found. Try adjusting your query or add more flights to the database.</p>';
             }
         }
 

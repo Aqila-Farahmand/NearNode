@@ -366,15 +366,19 @@ def vibe_search(request):
         search, options = AIVibeSearchService.search_by_vibe(
             parsed_query, request.user)
         search_data = TripSearchSerializer(search).data
+        top_matches = [
+            TripOptionSerializer(opt).data for opt in options
+        ]
     else:
         options = _search_vibe_for_anonymous(parsed_query)
         search_data = None
+        top_matches = options
 
     return Response({
         'search': search_data,
         'parsed_query': parsed_query,
         'ai_confidence': confidence,
-        'top_matches': options
+        'top_matches': top_matches
     })
 
 
