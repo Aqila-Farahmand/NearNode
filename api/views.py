@@ -374,11 +374,16 @@ def vibe_search(request):
         search_data = None
         top_matches = options
 
+    hint = None
+    if not top_matches and not parsed_query.get('origin_city'):
+        hint = 'Include an origin city (e.g. "from Milan" or "Paris") to see flight results.'
+
     return Response({
         'search': search_data,
         'parsed_query': parsed_query,
         'ai_confidence': confidence,
-        'top_matches': top_matches
+        'top_matches': top_matches,
+        'hint': hint
     })
 
 

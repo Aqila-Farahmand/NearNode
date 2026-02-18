@@ -566,7 +566,9 @@
                     container.innerHTML += buildVibeMatchCard(match, idx);
                 });
             } else {
-                container.innerHTML += '<p class="text-gray-600">No matches found. Try adjusting your query or add more flights to the database.</p>';
+                let msg = 'No matches found. Try adjusting your query or add more flights to the database.';
+                if (data.hint) msg += ' ' + data.hint;
+                container.innerHTML += '<p class="text-gray-600">' + msg + '</p>';
             }
         }
 

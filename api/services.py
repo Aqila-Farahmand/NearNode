@@ -386,48 +386,71 @@ class AIVibeSearchService:
     """Service for AI-driven natural language search"""
 
     @staticmethod
+    def _extract_json_from_content(content):
+        """Strip markdown code blocks and parse JSON from OpenAI response."""
+        if not content or not content.strip():
+            return None
+        text = content.strip()
+        # Remove optional ```json ... ``` wrapper
+        if text.startswith("```"):
+            lines = text.split("\n")
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            text = "\n".join(lines)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return None
+
+    @staticmethod
     def parse_query_with_ai(query_text):
-        """Use OpenAI to parse natural language query"""
-        if not settings.OPENAI_API_KEY:
-            # Fallback to simple parsing
-            return AIVibeSearchService._simple_parse(query_text)
+        """Use OpenAI to parse natural language query. Returns (parsed_dict, confidence)."""
+        api_key = getattr(settings, 'OPENAI_API_KEY', None) or ''
+        if not api_key.strip():
+            return AIVibeSearchService._simple_parse(query_text), 0.5
 
         try:
-            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+            client = openai.OpenAI(api_key=api_key)
 
             prompt = f"""Parse this travel query and extract structured information:
 Query: "{query_text}"
 
 Extract:
-- origin_city (if mentioned)
+- origin_city (if mentioned, e.g. city name)
 - destination_type (e.g., "warm beach", "mountain", "city", "cultural")
-- max_duration_hours (flight duration)
-- max_price_eur (budget)
+- max_duration_hours (flight duration in hours)
+- max_price_eur (budget as number)
 - date_range_start and date_range_end (if mentioned)
 - weather_preference (e.g., "warm", "sunny", "snow")
 
-Return JSON only with these fields. Use null for missing values."""
+Return only a single JSON object with these keys. Use null for missing values. No markdown, no code block."""
 
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system",
-                        "content": "You are a travel query parser. Return only valid JSON."},
+                     "content": "You are a travel query parser. Reply with exactly one JSON object, no other text."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3
             )
 
-            result = json.loads(response.choices[0].message.content)
-            return result, 0.9  # High confidence
-
+            raw = response.choices[0].message.content
+            result = AIVibeSearchService._extract_json_from_content(raw)
+            if result and isinstance(result, dict):
+                return result, 0.9
+            return AIVibeSearchService._simple_parse(query_text), 0.5
         except Exception as e:
-            print(f"AI parsing error: {e}")
+            import logging
+            logging.getLogger(__name__).warning("AI vibe parse failed: %s", e)
             return AIVibeSearchService._simple_parse(query_text), 0.5
 
     @staticmethod
     def _simple_parse(query_text):
-        """Simple keyword-based parsing fallback"""
+        """Simple keyword-based parsing fallback. Always returns a dict with expected keys."""
+        import re
         query_lower = query_text.lower()
         result = {
             'origin_city': None,
@@ -439,24 +462,35 @@ Return JSON only with these fields. Use null for missing values."""
             'weather_preference': None
         }
 
-        # Extract price
-        import re
-        price_match = re.search(r'€?(\d+)', query_text)
+        # Origin: "from Milan", "flying from Paris", "Milan" at start
+        from_match = re.search(r'(?:from|flying from)\s+([A-Z]+)', query_text, re.IGNORECASE)
+        if from_match:
+            result['origin_city'] = from_match.group(1).strip()
+        else:
+            # First word might be city (e.g. "Milan for under 300")
+            first_word = re.match(r'^\s*([A-Z]+)', query_text)
+            if first_word:
+                w = first_word.group(1)
+                if w.lower() not in ('i', 'a', 'the', 'want', 'need', 'looking', 'for', 'to', 'my', 'me'):
+                    result['origin_city'] = w
+
+        # Price
+        price_match = re.search(r'€?\s*(\d+)\s*(?:eur|euro|€|euros)?', query_lower)
         if price_match:
             result['max_price_eur'] = float(price_match.group(1))
 
-        # Extract duration
-        duration_match = re.search(r'(\d+)\s*hour', query_lower)
+        # Duration (e.g. "5 hour", "5-hour")
+        duration_match = re.search(r'(\d+)\s*-?\s*hour', query_lower)
         if duration_match:
             result['max_duration_hours'] = int(duration_match.group(1))
 
-        # Extract destination type
+        # Destination type
         if 'beach' in query_lower:
             result['destination_type'] = 'beach'
             result['weather_preference'] = 'warm'
         elif 'mountain' in query_lower:
             result['destination_type'] = 'mountain'
-        elif 'city' in query_lower:
+        elif 'city' in query_lower or 'cities' in query_lower:
             result['destination_type'] = 'city'
 
         return result
