@@ -8,7 +8,18 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #34A8EB 0%, #1e6bb8 50%, #0f4c81 100%);
+        }
+        .tab-btn {
+            border-bottom: 2px solid transparent;
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+        .tab-btn:hover {
+            color: #0a3d66;
+        }
+        .tab-btn.active {
+            color: #0f4c81;
+            border-bottom-color: #1e6bb8;
         }
         .card-hover {
             transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -20,53 +31,26 @@
     </style>
 </head>
 <body class="bg-gray-50">
-    <!-- Navigation -->
-    <nav class="gradient-bg text-white shadow-lg">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                    <i class="fas fa-plane text-2xl"></i>
-                    <h1 class="text-2xl font-bold">NearNode</h1>
-                </div>
-                <div class="flex items-center space-x-4">
-                    {% if user.is_authenticated %}
-                        <a href="{% url 'profile' %}" class="text-white text-sm hover:underline">
-                            <i class="fas fa-user mr-1"></i>{{ user.username }}
-                        </a>
-                        <a href="{% url 'logout' %}" class="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 text-white">
-                            <i class="fas fa-sign-out-alt mr-2"></i>Logout
-                        </a>
-                    {% else %}
-                        <a href="{% url 'login' %}" class="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 text-white">
-                            <i class="fas fa-sign-in-alt mr-2"></i>Login
-                        </a>
-                        <a href="{% url 'signup' %}" class="px-4 py-2 bg-white bg-opacity-30 rounded-lg hover:bg-opacity-40 text-white font-semibold">
-                            <i class="fas fa-user-plus mr-2"></i>Sign Up
-                        </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </nav>
+    {% include 'core/includes/nav.html' %}
 
     <!-- Main Container -->
     <div class="container mx-auto px-4 py-8">
         <!-- Feature Tabs -->
         <div class="bg-white rounded-lg shadow-md mb-6">
             <div class="flex border-b">
-                <button class="tab-btn active px-6 py-4 font-semibold text-blue-600 border-b-2 border-blue-600" data-tab="nearest-alternate">
+                <button class="tab-btn active px-6 py-4 font-semibold border-b-2 text-gray-600" data-tab="nearest-alternate">
                     <i class="fas fa-map-marker-alt mr-2"></i>Nearest Alternate
                 </button>
-                <button class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600" data-tab="multi-modal">
+                <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="multi-modal">
                     <i class="fas fa-train mr-2"></i>Multi-Modal
                 </button>
-                <button class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600" data-tab="vibe-search">
+                <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="vibe-search">
                     <i class="fas fa-magic mr-2"></i>AI Vibe Search
                 </button>
-                <button class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600" data-tab="collaborative">
+                <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="collaborative">
                     <i class="fas fa-heart mr-2"></i>Collaborative
                 </button>
-                <button class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600" data-tab="delay-check">
+                <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="delay-check">
                     <i class="fas fa-shield-alt mr-2"></i>Delay Protection
                 </button>
             </div>

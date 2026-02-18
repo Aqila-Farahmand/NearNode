@@ -1,0 +1,44 @@
+{% load static %}
+<style>
+    .nearnode-nav {
+        background: linear-gradient(135deg, #34A8EB 0%, #1e6bb8 50%, #0f4c81 100%);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    .nearnode-nav .nav-link {
+        color: rgba(255, 255, 255, 0.95);
+    }
+    .nearnode-nav .nav-link:hover {
+        background: rgba(0, 0, 0, 0.2);
+        color: #fff;
+    }
+</style>
+<nav class="nearnode-nav text-white py-3">
+    <div class="container mx-auto px-4">
+        <div class="flex items-center justify-between">
+            <a href="{% url 'home' %}" class="flex items-center no-underline text-white hover:opacity-90 transition-opacity">
+                <img src="{% static 'core/images/logo.png' %}" alt="NearNode" class="h-10 w-auto flex-shrink-0" />
+            </a>
+
+            <div class="flex items-center gap-1 sm:gap-4">
+                <a href="{% url 'home' %}" class="nav-link px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                    <i class="fas fa-home mr-1.5 hidden sm:inline" aria-hidden="true"></i>Home
+                </a>
+                {% if user.is_authenticated %}
+                    <a href="{% url 'profile' %}" class="nav-link px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                        <i class="fas fa-user mr-1.5 hidden sm:inline" aria-hidden="true"></i>Profile
+                    </a>
+                    <a href="{% url 'logout' %}" class="nav-link px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                        <i class="fas fa-sign-out-alt mr-1.5" aria-hidden="true"></i>Logout
+                    </a>
+                {% else %}
+                    <a href="{% url 'login' %}" class="nav-link px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                        <i class="fas fa-sign-in-alt mr-1.5" aria-hidden="true"></i>Login
+                    </a>
+                    <a href="{% url 'signup' %}" class="nav-link px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
+                        <i class="fas fa-user-plus mr-1.5" aria-hidden="true"></i>Sign up
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</nav>
