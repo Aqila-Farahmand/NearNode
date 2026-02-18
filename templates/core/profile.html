@@ -170,30 +170,67 @@
                     {% if saved_trips %}
                         <div class="space-y-4 max-h-96 overflow-y-auto">
                             {% for trip in saved_trips %}
-                                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow saved-trip-card" data-trip-id="{{ trip.id }}">
                                     <div class="flex justify-between items-start mb-2">
-                                        <div>
+                                        <div class="flex-1 min-w-0 cursor-pointer trip-summary" data-trip-id="{{ trip.id }}" title="Click to view flight details">
                                             <p class="font-semibold text-gray-800">
-                                                {% if trip.flight %}
-                                                    {{ trip.flight.origin_airport.iata_code }} → {{ trip.flight.destination_airport.iata_code }}
-                                                {% elif trip.flight_connection %}
-                                                    {{ trip.flight_connection.first_flight.origin_airport.iata_code }} → {{ trip.flight_connection.first_flight.destination_airport.iata_code }}
-                                                {% else %}
-                                                    Trip Option
-                                                {% endif %}
+                                                {{ trip.get_origin_display }} → {{ trip.get_destination_display }}
                                             </p>
                                             <p class="text-sm text-gray-600">
                                                 €{{ trip.total_trip_cost_eur }}
+                                                <span class="text-gray-400"> · {{ trip.total_trip_time_minutes|floatformat:0 }} min</span>
                                             </p>
                                         </div>
                                         <button data-trip-id="{{ trip.id }}" 
-                                            class="unsave-trip-btn text-red-500 hover:text-red-700">
+                                            class="unsave-trip-btn text-red-500 hover:text-red-700 ml-2 flex-shrink-0" title="Remove from saved">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
-                                    <p class="text-xs text-gray-500">
+                                    <p class="text-xs text-gray-500 mb-2">
                                         Saved {{ trip.saved_at|date:"M d, Y" }}
                                     </p>
+                                    <div class="trip-details hidden border-t border-gray-100 pt-3 mt-2 text-sm text-gray-700" id="trip-details-{{ trip.id }}">
+                                        {% if trip.display_data %}
+                                            {% with data=trip.display_data flight=data.flight airport=data.airport ground=data.ground_transport %}
+                                            {% if flight %}
+                                            <p class="font-medium">Flight</p>
+                                            <p>{{ flight.airline|default:"" }} {{ flight.flight_number|default:"" }}</p>
+                                            <p>{{ flight.origin_airport.iata_code|default:"" }} → {{ flight.destination_airport.iata_code|default:"" }}</p>
+                                            {% if flight.departure_time %}<p>Dep: {{ flight.departure_time }}</p>{% endif %}
+                                            {% if flight.arrival_time %}<p>Arr: {{ flight.arrival_time }}</p>{% endif %}
+                                            <p>Flight: €{{ data.flight_cost_eur|default:flight.price_eur|default:"—" }}</p>
+                                            {% endif %}
+                                            {% if airport %}
+                                            <p class="mt-2 font-medium">Alternate airport</p>
+                                            <p>{{ airport.name|default:"" }} ({{ airport.iata_code|default:"" }})</p>
+                                            {% if data.distance_to_destination_km %}<p>{{ data.distance_to_destination_km|floatformat:1 }} km to destination</p>{% endif %}
+                                            {% endif %}
+                                            {% if ground %}
+                                            <p class="mt-2 font-medium">Ground</p>
+                                            <p>{{ ground.name|default:"" }} €{{ data.ground_cost_eur|default:ground.cost_eur|default:"—" }}</p>
+                                            {% endif %}
+                                            {% endwith %}
+                                        {% elif trip.flight %}
+                                            <p class="font-medium">Flight</p>
+                                            <p>{{ trip.flight.airline }} {{ trip.flight.flight_number }}</p>
+                                            <p>{{ trip.flight.origin_airport.iata_code }} → {{ trip.flight.destination_airport.iata_code }}</p>
+                                            <p>Dep: {{ trip.flight.departure_time|date:"M d, H:i" }} · Arr: {{ trip.flight.arrival_time|date:"M d, H:i" }}</p>
+                                            <p>€{{ trip.flight.price_eur }}</p>
+                                        {% elif trip.flight_connection %}
+                                            <p class="font-medium">Connection</p>
+                                            <p>{{ trip.flight_connection.first_flight.airline }} {{ trip.flight_connection.first_flight.flight_number }}: {{ trip.flight_connection.first_flight.origin_airport.iata_code }} → {{ trip.flight_connection.first_flight.destination_airport.iata_code }}</p>
+                                            {% if trip.flight_connection.second_flight %}
+                                            <p>{{ trip.flight_connection.second_flight.airline }} {{ trip.flight_connection.second_flight.flight_number }}: {{ trip.flight_connection.second_flight.origin_airport.iata_code }} → {{ trip.flight_connection.second_flight.destination_airport.iata_code }}</p>
+                                            {% endif %}
+                                            {% if trip.flight_connection.ground_transport %}
+                                            <p>Ground: {{ trip.flight_connection.ground_transport.name }}</p>
+                                            {% endif %}
+                                            <p>€{{ trip.flight_connection.total_cost_eur }}</p>
+                                        {% endif %}
+                                    </div>
+                                    <button type="button" class="trip-toggle-details text-blue-600 hover:text-blue-800 text-xs mt-1" data-trip-id="{{ trip.id }}" aria-expanded="false">
+                                        <i class="fas fa-chevron-down mr-1"></i><span class="trip-toggle-text">View flight details</span>
+                                    </button>
                                 </div>
                             {% endfor %}
                         </div>
@@ -301,11 +338,38 @@
                 });
             }
             document.querySelectorAll('.unsave-trip-btn').forEach(function(button) {
-                button.addEventListener('click', function() {
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation();
                     const tripId = Number.parseInt(this.dataset.tripId, 10);
-                    if (tripId) {
-                        unsaveTrip(tripId);
-                    }
+                    if (tripId) unsaveTrip(tripId);
+                });
+            });
+            function toggleTripDetails(tripId) {
+                const detailsEl = document.getElementById('trip-details-' + tripId);
+                const card = document.querySelector('.saved-trip-card[data-trip-id="' + tripId + '"]');
+                if (!detailsEl || !card) return;
+                const isHidden = detailsEl.classList.contains('hidden');
+                detailsEl.classList.toggle('hidden', !isHidden);
+                const toggleBtn = card.querySelector('.trip-toggle-details');
+                if (toggleBtn) {
+                    toggleBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+                    const icon = toggleBtn.querySelector('i.fas');
+                    const text = toggleBtn.querySelector('.trip-toggle-text');
+                    if (icon) icon.className = isHidden ? 'fas fa-chevron-up mr-1' : 'fas fa-chevron-down mr-1';
+                    if (text) text.textContent = isHidden ? 'Hide flight details' : 'View flight details';
+                }
+            }
+            document.querySelectorAll('.trip-toggle-details').forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const tripId = Number.parseInt(this.dataset.tripId, 10);
+                    if (tripId) toggleTripDetails(tripId);
+                });
+            });
+            document.querySelectorAll('.trip-summary').forEach(function(el) {
+                el.addEventListener('click', function(e) {
+                    const tripId = Number.parseInt(this.dataset.tripId, 10);
+                    if (tripId) toggleTripDetails(tripId);
                 });
             });
         });

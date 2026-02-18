@@ -168,23 +168,50 @@ def profile_view(request):
 
 
 def _get_or_create_trip_option(data):
-    """Helper function to get or create a trip option from request data"""
+    """Helper function to get or create a trip option from request data.
+    Accepts trip_option_id, flight_id, connection_id (DB), or offer (API payload).
+    """
     trip_option_id = data.get('trip_option_id')
     flight_id = data.get('flight_id')
     connection_id = data.get('connection_id')
+    offer = data.get('offer')
 
     if trip_option_id:
         return TripOption.objects.get(id=trip_option_id)
 
-    if flight_id:
-        flight = Flight.objects.get(id=flight_id)
+    # Save from API (e.g. Amadeus): no DB Flight, store full offer in display_data
+    if offer and isinstance(offer, dict):
+        cost = offer.get('total_trip_cost_eur')
+        minutes = offer.get('total_trip_time_minutes')
+        if cost is None:
+            cost = Decimal('0')
+        if minutes is None:
+            minutes = 0
         return TripOption.objects.create(
-            flight=flight,
-            total_trip_cost_eur=flight.price_eur,
-            total_trip_time_minutes=flight.duration_minutes,
+            flight=None,
+            flight_connection=None,
+            total_trip_cost_eur=Decimal(str(cost)),
+            total_trip_time_minutes=int(minutes),
+            display_data=offer,
             match_score=Decimal('100.0'),
             rank=1
         )
+
+    # DB flight (flight_id must be an integer PK)
+    if flight_id is not None:
+        try:
+            fid = int(flight_id)
+        except (TypeError, ValueError):
+            fid = None
+        if fid is not None:
+            flight = Flight.objects.get(id=fid)
+            return TripOption.objects.create(
+                flight=flight,
+                total_trip_cost_eur=flight.price_eur,
+                total_trip_time_minutes=flight.duration_minutes,
+                match_score=Decimal('100.0'),
+                rank=1
+            )
 
     if connection_id:
         connection = FlightConnection.objects.get(id=connection_id)

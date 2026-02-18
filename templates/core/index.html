@@ -311,7 +311,7 @@
                             <p class="font-semibold">${timeH}h ${timeM}m</p>
                         </div>
                         <div>
-                            <button onclick="saveTrip(${result.flight_id || null}, null)" 
+                            <button onclick="saveTripByIndex(${idx})" 
                                 class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
                                 <i class="fas fa-bookmark mr-1"></i>Save Trip
                             </button>
@@ -334,6 +334,7 @@
             const needRate = data.currency === 'EUR' ? false : (first && first.total_trip_cost_converted);
             const exchangeRate = needRate ? first.total_trip_cost_converted / first.total_trip_cost_eur : 1;
             if (data.results && data.results.length > 0) {
+                globalThis.lastNearestAlternateResults = data.results;
                 container.innerHTML = data.results.map((result, idx) =>
                     buildNearestAlternateCard(result, idx, currencySymbol, exchangeRate)
                 ).join('');
@@ -342,13 +343,40 @@
             }
         }
         
+        /** Save from nearest-alternate by result index (sends full offer for API results). */
+        async function saveTripByIndex(idx) {
+            const results = globalThis.lastNearestAlternateResults;
+            if (!results || !results[idx]) {
+                alert('Cannot save: result no longer available. Run the search again.');
+                return;
+            }
+            const offer = results[idx];
+            const payload = {
+                offer: {
+                    flight_id: offer.flight_id,
+                    flight: offer.flight,
+                    airport: offer.airport,
+                    distance_to_destination_km: offer.distance_to_destination_km,
+                    total_trip_cost_eur: offer.total_trip_cost_eur,
+                    total_trip_time_minutes: offer.total_trip_time_minutes,
+                    flight_cost_eur: offer.flight_cost_eur,
+                    ground_cost_eur: offer.ground_cost_eur,
+                    ground_transport: offer.ground_transport
+                }
+            };
+            await sendSaveTripRequest(payload);
+        }
+
         async function saveTrip(flightId, connectionId) {
             if (!flightId && !connectionId) {
                 alert('Please login to save trips');
                 globalThis.location.href = '/login/';
                 return;
             }
-            
+            await sendSaveTripRequest({ flight_id: flightId, connection_id: connectionId });
+        }
+
+        async function sendSaveTripRequest(payload) {
             try {
                 const response = await fetch('/api/save-trip/', {
                     method: 'POST',
@@ -357,18 +385,13 @@
                         'X-CSRFToken': getCookie('csrftoken')
                     },
                     credentials: 'include',
-                    body: JSON.stringify({
-                        flight_id: flightId,
-                        connection_id: connectionId
-                    })
+                    body: JSON.stringify(payload)
                 });
-                
                 if (response.status === 403) {
                     alert('Please login to save trips');
                     globalThis.location.href = '/login/';
                     return;
                 }
-                
                 const result = await response.json();
                 if (result.success) {
                     alert('Trip saved successfully! View it in your profile.');

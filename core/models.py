@@ -299,10 +299,33 @@ class TripOption(models.Model):
     )
     saved_at = models.DateTimeField(null=True, blank=True)
 
+    # When saved from real API (e.g. Amadeus), store offer payload; flight is null
+    display_data = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Flight/offer details when saved from API (no DB flight)"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['rank', 'total_trip_cost_eur']
+
+    def get_origin_display(self):
+        """Origin code for display (from flight or display_data)."""
+        if self.flight:
+            return self.flight.origin_airport.iata_code
+        data = self.display_data or {}
+        o = (data.get('flight') or {}).get('origin_airport') or {}
+        return o.get('iata_code', '') if isinstance(o, dict) else str(o)
+
+    def get_destination_display(self):
+        """Destination code for display."""
+        if self.flight:
+            return self.flight.destination_airport.iata_code
+        data = self.display_data or {}
+        d = (data.get('flight') or {}).get('destination_airport') or {}
+        return d.get('iata_code', '') if isinstance(d, dict) else str(d)
 
     def __str__(self):
         return f"Option {self.rank} for search {self.search.id if self.search else 'unsaved'}"
