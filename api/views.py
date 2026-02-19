@@ -26,7 +26,7 @@ from . import amadeus_client
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def nearest_airport(request):
     """
     GET ?lat=...&lon=... — returns the airport nearest to the given coordinates.
@@ -59,7 +59,7 @@ class AirportViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for airports"""
     queryset = Airport.objects.all()
     serializer_class = AirportSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=['get'])
     def nearby(self, request):
@@ -85,7 +85,7 @@ class FlightViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for flights"""
     queryset = Flight.objects.all()
     serializer_class = FlightSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         queryset = Flight.objects.all()
@@ -108,7 +108,7 @@ class FlightViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def nearest_alternate_search(request):
     """
     Feature 1: Nearest Alternate Optimization
@@ -241,7 +241,7 @@ def _nearest_alternate_empty_hint(origin_airport_code, final_destination_address
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def multi_modal_search(request):
     """
     Feature 2: Multi-Modal Connection Logic
@@ -259,7 +259,8 @@ def multi_modal_search(request):
 
     try:
         origin = Airport.objects.get(iata_code__iexact=origin_code.strip())
-        destination = Airport.objects.get(iata_code__iexact=destination_code.strip())
+        destination = Airport.objects.get(
+            iata_code__iexact=destination_code.strip())
         date = datetime.strptime(date_str, '%Y-%m-%d').date()
     except Airport.DoesNotExist:
         return Response({'error': 'Airport not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -305,50 +306,8 @@ def multi_modal_search(request):
     })
 
 
-def _search_vibe_for_anonymous(parsed_query):
-    """Helper function to search vibe for anonymous users"""
-    matching_airports = AIVibeSearchService._find_matching_airports(
-        parsed_query)
-    options = []
-
-    # Find origin airport if specified
-    origin_airport = None
-    if parsed_query.get('origin_city'):
-        origin_airport = Airport.objects.filter(
-            city__icontains=parsed_query['origin_city']).first()
-
-    if not origin_airport:
-        return options
-
-    # Search flights for matching destinations
-    max_price = parsed_query.get('max_price_eur', 99999) or 99999
-    max_duration = (parsed_query.get('max_duration_hours', 24) or 24) * 60
-
-    for dest_airport in matching_airports[:10]:
-        flights = Flight.objects.filter(
-            origin_airport=origin_airport,
-            destination_airport=dest_airport,
-            price_eur__lte=max_price,
-            duration_minutes__lte=max_duration
-        )[:3]
-
-        for flight in flights:
-            match_score = AIVibeSearchService._calculate_match_score(
-                flight, parsed_query)
-            options.append({
-                'flight': FlightSerializer(flight).data,
-                'total_trip_cost_eur': float(flight.price_eur),
-                'total_trip_time_minutes': flight.duration_minutes,
-                'match_score': match_score
-            })
-
-    # Sort by match score and return top 3
-    options.sort(key=lambda x: x['match_score'], reverse=True)
-    return options[:3]
-
-
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def vibe_search(request):
     """
     Feature 3: AI-Driven "Vibe" Search
@@ -364,18 +323,11 @@ def vibe_search(request):
         query_text)
     parsed_query['original_query'] = query_text
 
-    # Search by vibe - handle anonymous users
-    if request.user.is_authenticated:
-        search, options = AIVibeSearchService.search_by_vibe(
-            parsed_query, request.user)
-        search_data = TripSearchSerializer(search).data
-        top_matches = [
-            TripOptionSerializer(opt).data for opt in options
-        ]
-    else:
-        options = _search_vibe_for_anonymous(parsed_query)
-        search_data = None
-        top_matches = options
+    # Search by vibe (user is authenticated)
+    search, options = AIVibeSearchService.search_by_vibe(
+        parsed_query, request.user)
+    search_data = TripSearchSerializer(search).data
+    top_matches = [TripOptionSerializer(opt).data for opt in options]
 
     hint = None
     if not top_matches and not parsed_query.get('origin_city'):
@@ -486,7 +438,7 @@ def get_perfect_matches(request):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def predict_delay(request):
     """
     Feature 5: Delay Prediction
@@ -511,7 +463,7 @@ def predict_delay(request):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def check_self_transfer_insurance(request):
     """
     Feature 5: Self-Transfer Insurance Check

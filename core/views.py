@@ -13,6 +13,12 @@ from decimal import Decimal
 import json
 
 
+@login_required
+def home_view(request):
+    """Main app view – requires login. Unauthenticated users are redirected to login/signup."""
+    return render(request, 'core/index.html')
+
+
 def _populate_user_profile(user, profile, post_data):
     """Helper function to populate user and profile with additional data"""
     email = post_data.get('email')
@@ -69,7 +75,7 @@ def login_view(request):
             if user is not None:
                 login(request, user)
                 messages.success(request, f'Welcome back, {user.username}!')
-                next_url = request.GET.get('next', 'home')
+                next_url = request.POST.get('next') or request.GET.get('next') or 'home'
                 return redirect(next_url)
             else:
                 messages.error(request, 'Invalid username or password.')
