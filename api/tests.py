@@ -2,25 +2,32 @@
 API tests for NearNode.
 Run: python manage.py test api
 """
-from django.test import TestCase, Client
+from django.test import TestCase
+from django.contrib.auth import get_user_model
 from django.utils import timezone
+from rest_framework.test import APIClient
 from datetime import timedelta
+
+User = get_user_model()
+
+# Test-only credential; not used in production.
+TEST_AUTH_SECRET = 'testpass123'
 
 
 class NearestAlternateAPITest(TestCase):
     """Test nearest-alternate and nearest-airport endpoints."""
 
     def setUp(self):
-        self.client = Client()
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='testuser', email='test@example.com', password=TEST_AUTH_SECRET
+        )
+        self.client.force_authenticate(user=self.user)
         self.url = '/api/nearest-alternate/'
 
     def test_nearest_alternate_requires_params(self):
         """Missing params return 400."""
-        r = self.client.post(
-            self.url,
-            {},
-            content_type='application/json',
-        )
+        r = self.client.post(self.url, {}, format='json')
         self.assertEqual(r.status_code, 400)
         self.assertIn('error', r.json())
 
@@ -34,7 +41,7 @@ class NearestAlternateAPITest(TestCase):
                 'date': 'not-a-date',
                 'radius_km': 100,
             },
-            content_type='application/json',
+            format='json',
         )
         self.assertEqual(r.status_code, 400)
         self.assertIn('error', r.json())
@@ -50,7 +57,7 @@ class NearestAlternateAPITest(TestCase):
                 'date': date,
                 'radius_km': 100,
             },
-            content_type='application/json',
+            format='json',
         )
         self.assertEqual(r.status_code, 200)
         data = r.json()
@@ -61,6 +68,13 @@ class NearestAlternateAPITest(TestCase):
 
 class NearestAirportAPITest(TestCase):
     """Test nearest-airport endpoint."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='testuser2', email='test2@example.com', password=TEST_AUTH_SECRET
+        )
+        self.client.force_authenticate(user=self.user)
 
     def test_nearest_airport_requires_lat_lon(self):
         """Missing lat/lon returns 400."""
