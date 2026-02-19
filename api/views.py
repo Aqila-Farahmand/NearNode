@@ -258,8 +258,8 @@ def multi_modal_search(request):
         )
 
     try:
-        origin = Airport.objects.get(iata_code=origin_code)
-        destination = Airport.objects.get(iata_code=destination_code)
+        origin = Airport.objects.get(iata_code__iexact=origin_code.strip())
+        destination = Airport.objects.get(iata_code__iexact=destination_code.strip())
         date = datetime.strptime(date_str, '%Y-%m-%d').date()
     except Airport.DoesNotExist:
         return Response({'error': 'Airport not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -287,6 +287,9 @@ def multi_modal_search(request):
             serialized['intermediate_airport'] = AirportSerializer(
                 conn['intermediate_airport']).data
             serialized['layover_minutes'] = conn['layover_minutes']
+            if conn.get('intermediate_airport_b'):
+                serialized['intermediate_airport_b'] = AirportSerializer(
+                    conn['intermediate_airport_b']).data
         else:
             serialized['flight1'] = FlightSerializer(conn['flight1']).data
             serialized['flight2'] = FlightSerializer(conn['flight2']).data

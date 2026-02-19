@@ -234,28 +234,28 @@ class MultiModalConnectionService:
 
     @staticmethod
     def calculate_layover_quality_score(airport, layover_minutes):
-        """Calculate layover quality based on airport amenities and time"""
+        """Calculate layover quality based on airport amenities and time."""
+        if airport is None:
+            return 0.0
         score = 0.0
-
-        # Base score from airport
-        score += float(airport.layover_quality_score)
-
-        # Time-based adjustments
-        if 60 <= layover_minutes <= 180:  # Good layover window
+        try:
+            score += float(airport.layover_quality_score or 0)
+        except (TypeError, ValueError):
+            pass
+        layover_minutes = int(layover_minutes) if layover_minutes is not None else 0
+        if 60 <= layover_minutes <= 180:
             score += 2.0
-        elif layover_minutes < 45:  # Too short
+        elif layover_minutes < 45:
             score -= 3.0
-        elif layover_minutes > 360:  # Too long
+        elif layover_minutes > 360:
             score -= 1.0
-
-        # Amenity bonuses
-        if airport.has_lounge:
+        if getattr(airport, 'has_lounge', False):
             score += 1.5
-        if airport.has_sleeping_pods:
+        if getattr(airport, 'has_sleeping_pods', False):
             score += 1.0
-        if airport.city_access_time > 0 and layover_minutes > 180:
-            score += 1.0  # Can visit city
-
+        city_access = getattr(airport, 'city_access_time', 0) or 0
+        if city_access > 0 and layover_minutes > 180:
+            score += 1.0
         return min(10.0, max(0.0, score))
 
     @staticmethod
@@ -286,18 +286,13 @@ class MultiModalConnectionService:
         return None
 
     @staticmethod
-    def create_multi_modal_connection(origin, destination, date):
-        """Create connections with train links when beneficial"""
-        connections = []
-
-        # Direct flights
-        direct_flights = Flight.objects.filter(
+    def _add_direct_connections(connections, origin, destination, date):
+        """Append direct flights to connections list."""
+        for flight in Flight.objects.filter(
             origin_airport=origin,
             destination_airport=destination,
             departure_time__date=date
-        )
-
-        for flight in direct_flights:
+        ):
             connections.append({
                 'type': 'direct',
                 'flight': flight,
@@ -306,79 +301,117 @@ class MultiModalConnectionService:
                 'connection_quality': 10.0
             })
 
-        # Multi-stop connections with train links
-        intermediate_airports = Airport.objects.exclude(
-            Q(id=origin.id) | Q(id=destination.id)
-        )[:20]  # Limit for performance
+    @staticmethod
+    def _add_train_link_connection(connections, seen, flight1, train, flight2,
+                                    airport_a, airport_b, max_layover_mins):
+        """Append one train-link connection if valid and not duplicate."""
+        layover = (flight2.departure_time - flight1.arrival_time).total_seconds() / 60
+        if layover > max_layover_mins:
+            return
+        key = (flight1.id, train.id, flight2.id)
+        if key in seen:
+            return
+        seen.add(key)
+        quality = MultiModalConnectionService.calculate_layover_quality_score(
+            airport_a, int(layover))
+        connections.append({
+            'type': 'train_link',
+            'flight1': flight1,
+            'flight2': flight2,
+            'train': train,
+            'intermediate_airport': airport_a,
+            'intermediate_airport_b': airport_b,
+            'total_cost': flight1.price_eur + flight2.price_eur + train.cost_eur,
+            'total_time': flight1.duration_minutes + flight2.duration_minutes + train.duration_minutes,
+            'connection_quality': quality,
+            'layover_minutes': int(layover)
+        })
 
-        for intermediate in intermediate_airports:
-            # Flight to intermediate
+    @staticmethod
+    def _add_same_airport_connection(connections, seen, flight1, flight2,
+                                     intermediate, max_layover_mins):
+        """Append one same-airport connection if valid and not duplicate."""
+        layover = (flight2.departure_time - flight1.arrival_time).total_seconds() / 60
+        if layover > max_layover_mins:
+            return
+        key = (flight1.id, None, flight2.id)
+        if key in seen:
+            return
+        seen.add(key)
+        quality = MultiModalConnectionService.calculate_layover_quality_score(
+            intermediate, int(layover))
+        connections.append({
+            'type': 'connection',
+            'flight1': flight1,
+            'flight2': flight2,
+            'intermediate_airport': intermediate,
+            'total_cost': flight1.price_eur + flight2.price_eur,
+            'total_time': flight1.duration_minutes + flight2.duration_minutes + int(layover),
+            'connection_quality': quality,
+            'layover_minutes': int(layover)
+        })
+
+    @staticmethod
+    def create_multi_modal_connection(origin, destination, date):
+        """Create connections with train links when beneficial.
+
+        Train links: fly to airport A, take train to airport B, fly from B.
+        Same-airport connections: fly to intermediate, fly from same intermediate.
+        """
+        connections = []
+        seen = set()
+        min_connection_mins = 60
+        max_layover_mins = 6 * 60
+
+        MultiModalConnectionService._add_direct_connections(
+            connections, origin, destination, date)
+
+        first_legs = Flight.objects.filter(
+            origin_airport=origin,
+            departure_time__date=date
+        ).select_related('destination_airport').exclude(
+            destination_airport=destination
+        )[:50]
+        for flight1 in first_legs:
+            airport_a = flight1.destination_airport
+            for train in GroundTransport.objects.filter(
+                    from_airport=airport_a,
+                    transport_type='train'
+            ).exclude(to_airport__isnull=True).exclude(to_airport=airport_a):
+                airport_b = train.to_airport
+                if airport_b.id == destination.id:
+                    continue
+                layover_min = min_connection_mins + train.duration_minutes
+                flight2 = Flight.objects.filter(
+                    origin_airport=airport_b,
+                    destination_airport=destination,
+                    departure_time__date=date,
+                    departure_time__gte=flight1.arrival_time + timedelta(minutes=layover_min)
+                ).first()
+                if flight2:
+                    MultiModalConnectionService._add_train_link_connection(
+                        connections, seen, flight1, train, flight2,
+                        airport_a, airport_b, max_layover_mins)
+
+        for intermediate in Airport.objects.exclude(
+                Q(id=origin.id) | Q(id=destination.id))[:20]:
             flight1 = Flight.objects.filter(
                 origin_airport=origin,
                 destination_airport=intermediate,
                 departure_time__date=date
             ).first()
-
             if not flight1:
                 continue
-
-            # Flight from intermediate
             flight2 = Flight.objects.filter(
                 origin_airport=intermediate,
                 destination_airport=destination,
-                departure_time__gte=flight1.arrival_time +
-                timedelta(minutes=60)
+                departure_time__gte=flight1.arrival_time + timedelta(minutes=min_connection_mins)
             ).first()
+            if flight2:
+                MultiModalConnectionService._add_same_airport_connection(
+                    connections, seen, flight1, flight2, intermediate, max_layover_mins)
 
-            if not flight2:
-                continue
-
-            layover = (flight2.departure_time -
-                       flight1.arrival_time).total_seconds() / 60
-
-            # Check for train connection
-            train = MultiModalConnectionService.find_train_connections(
-                flight1, flight2)
-
-            if train:
-                total_cost = flight1.price_eur + flight2.price_eur + train.cost_eur
-                total_time = flight1.duration_minutes + \
-                    flight2.duration_minutes + train.duration_minutes
-                quality = MultiModalConnectionService.calculate_layover_quality_score(
-                    intermediate, train.duration_minutes)
-
-                connections.append({
-                    'type': 'train_link',
-                    'flight1': flight1,
-                    'flight2': flight2,
-                    'train': train,
-                    'intermediate_airport': intermediate,
-                    'total_cost': total_cost,
-                    'total_time': total_time,
-                    'connection_quality': quality,
-                    'layover_minutes': layover
-                })
-            else:
-                # Regular connection
-                total_cost = flight1.price_eur + flight2.price_eur
-                total_time = flight1.duration_minutes + flight2.duration_minutes + layover
-                quality = MultiModalConnectionService.calculate_layover_quality_score(
-                    intermediate, layover)
-
-                connections.append({
-                    'type': 'connection',
-                    'flight1': flight1,
-                    'flight2': flight2,
-                    'intermediate_airport': intermediate,
-                    'total_cost': total_cost,
-                    'total_time': total_time,
-                    'connection_quality': quality,
-                    'layover_minutes': layover
-                })
-
-        # Sort by total cost, then quality
-        connections.sort(key=lambda x: (
-            x['total_cost'], -x['connection_quality']))
+        connections.sort(key=lambda x: (x['total_cost'], -x['connection_quality']))
         return connections
 
 
