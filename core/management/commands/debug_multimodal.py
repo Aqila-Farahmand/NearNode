@@ -41,7 +41,7 @@ class Command(BaseCommand):
             destination = Airport.objects.get(iata_code__iexact=dest_code)
         except Airport.DoesNotExist as e:
             self.stderr.write(self.style.ERROR('Airport not found: {}'.format(e)))
-            self.stdout.write('Available LHR/BRU/AMS/CDG: run python manage.py seed_multimodal_demo --date {}'.format(search_date))
+            self.stdout.write('Add airports and flights to the database for the date {}'.format(search_date))
             return
 
         self.stdout.write('Airports: {} (id={}), {} (id={})'.format(
@@ -54,7 +54,7 @@ class Command(BaseCommand):
 
         if count_on_date == 0:
             self.stdout.write(self.style.WARNING(
-                'No flights on this date. Seed data with: python manage.py seed_multimodal_demo --date {}'.format(search_date)
+                'No flights on this date. Add flight data for {}.'.format(search_date)
             ))
         else:
             for f in all_on_date.select_related('origin_airport', 'destination_airport')[:30]:

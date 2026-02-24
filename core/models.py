@@ -238,7 +238,7 @@ class UserProfile(models.Model):
 
 
 class TripSearch(models.Model):
-    """User trip search with vibe/NLP query"""
+    """User trip search from AI Search (natural language query)."""
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='trip_searches')
     query_text = models.TextField(help_text="Natural language search query")
@@ -311,21 +311,52 @@ class TripOption(models.Model):
     class Meta:
         ordering = ['rank', 'total_trip_cost_eur']
 
+    def _airport_display(self, airport, code_only=False):
+        """Format airport as 'CODE' or 'CODE – City, Country' when city/country available."""
+        if not airport:
+            return ''
+        if hasattr(airport, 'iata_code'):
+            code = airport.iata_code or ''
+            city = getattr(airport, 'city', None) or ''
+            country = getattr(airport, 'country', None) or ''
+        elif isinstance(airport, dict):
+            code = airport.get('iata_code', '')
+            city = airport.get('city', '') or airport.get('name', '')
+            country = airport.get('country', '')
+        else:
+            return str(airport)
+        if code_only:
+            return code
+        if city or country:
+            parts = [p for p in [city, country] if p]
+            return f"{code} – {', '.join(parts)}" if parts else code
+        return code
+
     def get_origin_display(self):
-        """Origin code for display (from flight or display_data)."""
+        """Origin for display: airport code and optionally city, country."""
         if self.flight:
-            return self.flight.origin_airport.iata_code
+            return self._airport_display(self.flight.origin_airport)
         data = self.display_data or {}
         o = (data.get('flight') or {}).get('origin_airport') or {}
-        return o.get('iata_code', '') if isinstance(o, dict) else str(o)
+        return self._airport_display(o) if o else ''
 
     def get_destination_display(self):
-        """Destination code for display."""
+        """Destination for display: airport code and optionally city, country."""
         if self.flight:
-            return self.flight.destination_airport.iata_code
+            return self._airport_display(self.flight.destination_airport)
         data = self.display_data or {}
         d = (data.get('flight') or {}).get('destination_airport') or {}
-        return d.get('iata_code', '') if isinstance(d, dict) else str(d)
+        return self._airport_display(d) if d else ''
+
+    def get_destination_city(self):
+        """Destination city name for weather lookup (from flight or display_data)."""
+        if self.flight:
+            return getattr(self.flight.destination_airport, 'city', None) or self.flight.destination_airport.name
+        data = self.display_data or {}
+        d = (data.get('flight') or {}).get('destination_airport') or {}
+        if isinstance(d, dict):
+            return d.get('city') or d.get('name') or ''
+        return ''
 
     def __str__(self):
         return f"Option {self.rank} for search {self.search.id if self.search else 'unsaved'}"

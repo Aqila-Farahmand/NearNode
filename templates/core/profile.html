@@ -171,13 +171,21 @@
                                     <p class="text-xs text-gray-500 mb-2">
                                         Saved {{ trip.saved_at|date:"M d, Y" }}
                                     </p>
+                                    {% if trip.destination_weather %}
+                                    <p class="text-xs text-blue-600 mb-2">
+                                        <i class="fas fa-cloud-sun mr-1"></i>{{ trip.destination_weather.temp_c|default:"" }}{% if trip.destination_weather.temp_c %}°C{% endif %}{% if trip.destination_weather.description %}, {{ trip.destination_weather.description }}{% endif %}
+                                    </p>
+                                    {% endif %}
                                     <div class="trip-details hidden border-t border-gray-100 pt-3 mt-2 text-sm text-gray-700" id="trip-details-{{ trip.id }}">
                                         {% if trip.display_data %}
                                             {% with data=trip.display_data flight=data.flight airport=data.airport ground=data.ground_transport %}
                                             {% if flight %}
                                             <p class="font-medium">Flight</p>
                                             <p>{{ flight.airline|default:"" }} {{ flight.flight_number|default:"" }}</p>
-                                            <p>{{ flight.origin_airport.iata_code|default:"" }} → {{ flight.destination_airport.iata_code|default:"" }}</p>
+                                            <p>{% if flight.origin_airport %}{{ flight.origin_airport.iata_code|default:flight.origin_airport.name|default:"" }}{% endif %} → {% if flight.destination_airport %}{{ flight.destination_airport.iata_code|default:flight.destination_airport.name|default:"" }}{% endif %}</p>
+                                            {% if flight.origin_airport and flight.destination_airport %}
+                                            <p class="text-gray-600">{% if flight.origin_airport.city %}{{ flight.origin_airport.city }}{% if flight.origin_airport.country %}, {{ flight.origin_airport.country }}{% endif %}{% endif %} → {% if flight.destination_airport.city %}{{ flight.destination_airport.city }}{% if flight.destination_airport.country %}, {{ flight.destination_airport.country }}{% endif %}{% endif %}</p>
+                                            {% endif %}
                                             {% if flight.departure_time %}<p>Dep: {{ flight.departure_time }}</p>{% endif %}
                                             {% if flight.arrival_time %}<p>Arr: {{ flight.arrival_time }}</p>{% endif %}
                                             <p>Flight: €{{ data.flight_cost_eur|default:flight.price_eur|default:"—" }}</p>

@@ -61,11 +61,8 @@ def get_token():
     return _token_cache['token']
 
 
-def search_flight_offers(origin_iata, destination_iata, departure_date, adults=1):
-    """
-    Call Amadeus Flight Offers Search. Returns list of offer dicts with
-    id, price_eur, duration_minutes, airline (first carrier), segments.
-    """
+def _fetch_flight_offers_raw(origin_iata, destination_iata, departure_date, adults=1):
+    """Call Amadeus Flight Offers Search. Returns raw list of offer dicts from API."""
     token = get_token()
     if not token:
         return []
@@ -84,8 +81,43 @@ def search_flight_offers(origin_iata, destination_iata, departure_date, adults=1
     if not resp.ok:
         return []
     data = resp.json()
-    offers = data.get('data') or []
+    return data.get('data') or []
+
+
+def search_flight_offers(origin_iata, destination_iata, departure_date, adults=1):
+    """
+    Call Amadeus Flight Offers Search. Returns list of offer dicts with
+    id, price_eur, duration_minutes, airline (first carrier), segments.
+    """
+    offers = _fetch_flight_offers_raw(origin_iata, destination_iata, departure_date, adults)
     return [_map_one_offer(offer) for offer in offers]
+
+
+def search_flight_offers_for_ai_search(origin_iata, destination_iata, departure_date, origin_airport_dict=None, destination_airport_dict=None, adults=1):
+    """
+    Same as search_flight_offers but returns flight dicts with origin_airport, destination_airport,
+    departure_time, arrival_time for AI search / frontend display.
+    """
+    offers = _fetch_flight_offers_raw(origin_iata, destination_iata, departure_date, adults)
+    origin = origin_airport_dict or {'iata_code': origin_iata[:3], 'name': origin_iata, 'city': ''}
+    dest = destination_airport_dict or {'iata_code': destination_iata[:3], 'name': destination_iata, 'city': ''}
+    return [_map_one_offer_rich(offer, origin, dest) for offer in offers]
+
+
+def _map_one_offer_rich(offer, origin_airport_dict, destination_airport_dict):
+    """Map one Amadeus offer to a flight dict with airport and times for AI search display."""
+    base = _map_one_offer(offer)
+    itineraries = offer.get('itineraries') or []
+    segments = (itineraries[0].get('segments') or []) if itineraries else []
+    seg0 = segments[0] if segments else {}
+    dep = (seg0.get('departure') or {}).get('at') or ''
+    arr = (seg0.get('arrival') or {}).get('at') or ''
+    base['origin_airport'] = origin_airport_dict
+    base['destination_airport'] = destination_airport_dict
+    base['departure_time'] = dep
+    base['arrival_time'] = arr
+    base['flight_number'] = base.get('number', '') or ''
+    return base
 
 
 def _map_one_offer(offer):

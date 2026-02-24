@@ -174,6 +174,14 @@ OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
 FLIGHT_API_KEY = config('FLIGHT_API_KEY', default='')
 WEATHER_API_KEY = config('WEATHER_API_KEY', default='')  # For weather data
 
+# AI Search LLM. Set in .env: AI_SEARCH_LLM_BACKEND=ollama, OLLAMA_BASE_URL, AI_SEARCH_OLLAMA_MODEL.
+AI_SEARCH_LLM_BACKEND = config('AI_SEARCH_LLM_BACKEND', default='').strip().lower() or None
+GROQ_API_KEY = config('GROQ_API_KEY', default='')
+OLLAMA_BASE_URL = config('OLLAMA_BASE_URL', default='')
+AI_SEARCH_OPENAI_MODEL = config('AI_SEARCH_OPENAI_MODEL', default='')
+AI_SEARCH_GROQ_MODEL = config('AI_SEARCH_GROQ_MODEL', default='')
+AI_SEARCH_OLLAMA_MODEL = config('AI_SEARCH_OLLAMA_MODEL', default='')
+
 # Authentication settings
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'

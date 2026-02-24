@@ -15,7 +15,7 @@ from django.utils import timezone
 from core.models import Airport, Flight, GroundTransport
 
 
-# Demo airports: London, Brussels, Amsterdam, Paris
+# Demo airports: London, Brussels, Amsterdam, Paris, Luxembourg
 DEMO_AIRPORTS = [
     {'icao': 'EGLL', 'iata': 'LHR', 'name': 'London Heathrow', 'city': 'London', 'country': 'United Kingdom',
      'lat': '51.4700', 'lon': '-0.4543', 'layover_score': '7.00', 'has_lounge': True, 'city_mins': 45},
@@ -25,6 +25,8 @@ DEMO_AIRPORTS = [
      'lat': '52.3105', 'lon': '4.7683', 'layover_score': '8.00', 'has_lounge': True, 'has_sleeping_pods': True, 'city_mins': 20},
     {'icao': 'LFPG', 'iata': 'CDG', 'name': 'Paris Charles de Gaulle', 'city': 'Paris', 'country': 'France',
      'lat': '49.0097', 'lon': '2.5478', 'layover_score': '6.00', 'has_lounge': True, 'city_mins': 35},
+    {'icao': 'ELLX', 'iata': 'LUX', 'name': 'Luxembourg Findel', 'city': 'Luxembourg', 'country': 'Luxembourg',
+     'lat': '49.6233', 'lon': '6.2044', 'layover_score': '6.00', 'has_lounge': True, 'city_mins': 15},
 ]
 
 
@@ -60,7 +62,7 @@ def ensure_demo_airports(stdout, style):
 def ensure_demo_flights(airports, flight_date, stdout, style):
     """Create flights so we have direct, connection, and train-link options (LHR -> CDG)."""
     # Use UTC so departure_time__date=date matches regardless of server TZ
-    base = datetime.combine(flight_date, time(0, 0), tzinfo=timezone.utc)
+    base = datetime.combine(flight_date, time(0, 0), tzinfo=timezone.UTC)
     flights_created = 0
 
     # LHR -> CDG direct
@@ -138,6 +140,44 @@ def ensure_demo_flights(airports, flight_date, stdout, style):
             duration_minutes=75,
         )
         flights_created += 1
+
+    # LUX -> CDG (so "From Luxembourg" AI search returns results; under €90 for budget queries)
+    if 'LUX' in airports:
+        f = Flight.objects.filter(
+            origin_airport=airports['LUX'],
+            destination_airport=airports['CDG'],
+            departure_time__date=flight_date
+        ).first()
+        if not f:
+            Flight.objects.create(
+                flight_number='LG8001',
+                airline='Luxair',
+                origin_airport=airports['LUX'],
+                destination_airport=airports['CDG'],
+                departure_time=base + timedelta(hours=10, minutes=0),
+                arrival_time=base + timedelta(hours=11, minutes=20),
+                price_eur=Decimal('72.00'),
+                duration_minutes=80,
+            )
+            flights_created += 1
+        # LUX -> BRU
+        f = Flight.objects.filter(
+            origin_airport=airports['LUX'],
+            destination_airport=airports['BRU'],
+            departure_time__date=flight_date
+        ).first()
+        if not f:
+            Flight.objects.create(
+                flight_number='LG8002',
+                airline='Luxair',
+                origin_airport=airports['LUX'],
+                destination_airport=airports['BRU'],
+                departure_time=base + timedelta(hours=14, minutes=0),
+                arrival_time=base + timedelta(hours=14, minutes=50),
+                price_eur=Decimal('65.00'),
+                duration_minutes=50,
+            )
+            flights_created += 1
 
     if flights_created:
         stdout.write(style.SUCCESS('  Created {} flight(s)'.format(flights_created)))

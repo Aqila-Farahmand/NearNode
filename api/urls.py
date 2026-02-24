@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     AirportViewSet, FlightViewSet,
-    nearest_alternate_search, multi_modal_search, vibe_search,
+    nearest_alternate_search, multi_modal_search, ai_search,
     generate_partner_sync_code, link_partner, vote_on_trip,
     get_perfect_matches, predict_delay, check_self_transfer_insurance,
     get_user_profile, update_user_profile,
@@ -22,8 +22,8 @@ urlpatterns = [
     # Feature 2: Multi-Modal Connections
     path('multi-modal/', multi_modal_search, name='multi-modal'),
 
-    # Feature 3: AI Vibe Search
-    path('vibe-search/', vibe_search, name='vibe-search'),
+    # Feature 3: AI Search (natural language)
+    path('ai-search/', ai_search, name='ai-search'),
 
     # Feature 4: Collaborative Mode
     path('collaborative/generate-code/',

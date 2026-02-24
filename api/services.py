@@ -1,15 +1,18 @@
 """
 Service layer for business logic
 """
+import json
+from datetime import datetime, timedelta
+
+import httpx
+import openai
+from django.conf import settings
 from django.db.models import Q, F, DecimalField, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
+
 from core.models import Airport, Flight, FlightConnection, GroundTransport, TripOption, TripSearch, CollaborativeVote, PerfectMatch, DelayPrediction, UserProfile
-import openai
-from django.conf import settings
-import json
-from datetime import datetime, timedelta
 
 
 class NearestAlternateService:
@@ -415,43 +418,112 @@ class MultiModalConnectionService:
         return connections
 
 
-class AIVibeSearchService:
-    """Service for AI-driven natural language search"""
+class AISearchService:
+    """AI Search: natural language search for trips. User writes text; AI parses and finds options. Supports OpenAI, Groq, or Ollama."""
+
+    @staticmethod
+    def _strip_markdown_code_block(text):
+        """Remove optional ```...``` wrapper from text."""
+        if not text.startswith("```"):
+            return text
+        lines = text.split("\n")
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        return "\n".join(lines)
+
+    @staticmethod
+    def _parse_first_json_object(text):
+        """Find first {...} with balanced braces and parse as JSON. Returns dict or None."""
+        start = text.find('{')
+        if start < 0:
+            return None
+        depth = 0
+        for i in range(start, len(text)):
+            if text[i] == '{':
+                depth += 1
+            elif text[i] == '}':
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[start:i + 1])
+                    except json.JSONDecodeError:
+                        return None
+        return None
 
     @staticmethod
     def _extract_json_from_content(content):
-        """Strip markdown code blocks and parse JSON from OpenAI response."""
+        """Strip markdown code blocks and parse JSON from LLM response. Tolerates extra text (e.g. from TinyLlama)."""
         if not content or not content.strip():
             return None
         text = content.strip()
-        # Remove optional ```json ... ``` wrapper
-        if text.startswith("```"):
-            lines = text.split("\n")
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            text = "\n".join(lines)
+        text = AISearchService._strip_markdown_code_block(text)
         try:
             return json.loads(text)
         except json.JSONDecodeError:
-            return None
+            pass
+        return AISearchService._parse_first_json_object(text)
 
     @staticmethod
-    def parse_query_with_ai(query_text):
-        """Use OpenAI to parse natural language query. Returns (parsed_dict, confidence)."""
-        api_key = getattr(settings, 'OPENAI_API_KEY', None) or ''
-        if not api_key.strip():
-            return AIVibeSearchService._simple_parse(query_text), 0.5
+    def _get_llm_client_and_model():
+        """
+        Return (client, model_name) for Ollama only, or (None, None).
+        AI Search uses local Ollama only; no OpenAI/Groq. If Ollama is not configured or not running, keyword fallback is used.
+        """
+        backend = (getattr(settings, 'AI_SEARCH_LLM_BACKEND', None) or '').strip().lower()
+        if backend != 'ollama':
+            return None, None
 
-        try:
-            client = openai.OpenAI(api_key=api_key)
+        base_url = (getattr(settings, 'OLLAMA_BASE_URL', None) or '').strip().rstrip('/')
+        model = (getattr(settings, 'AI_SEARCH_OLLAMA_MODEL', None) or '').strip()
+        if not base_url or not model:
+            return None, None
 
-            prompt = f"""Parse this travel query and extract structured information:
+        if not base_url.endswith('/v1'):
+            base_url = base_url + '/v1'
+        base_url = base_url + '/'
+        http_client = httpx.Client(timeout=60.0)
+        client = openai.OpenAI(api_key='ollama', base_url=base_url, http_client=http_client)
+        return client, model
+
+    @staticmethod
+    def get_available_origin_cities():
+        """Return list of city names that have at least one outgoing flight in the database (for LLM context)."""
+        return list(
+            Airport.objects.filter(
+                id__in=Flight.objects.values_list('origin_airport_id', flat=True).distinct()
+            ).values_list('city', flat=True).distinct().order_by('city')
+        )
+
+    @staticmethod
+    def get_available_destination_cities():
+        """Return list of city names that are destinations of at least one flight (for LLM context)."""
+        return list(
+            Airport.objects.filter(
+                id__in=Flight.objects.values_list('destination_airport_id', flat=True).distinct()
+            ).values_list('city', flat=True).distinct().order_by('city')
+        )
+
+    @staticmethod
+    def parse_query_with_ai(query_text, available_origin_cities=None, available_destination_cities=None):
+        """Use configured LLM to parse natural language query. Optionally pass DB-derived origin/destination cities so the model can normalize to actual data."""
+        client, model = AISearchService._get_llm_client_and_model()
+        if client is None:
+            return AISearchService._simple_parse(query_text), 0.5
+
+        db_context = ''
+        if available_origin_cities:
+            db_context += f"\nAvailable origin cities in our flight database (use one of these if the user's origin matches): {', '.join(available_origin_cities)}."
+        if available_destination_cities:
+            db_context += f"\nAvailable destination cities in our database: {', '.join(available_destination_cities)}."
+
+        prompt = f"""Parse this travel query and extract structured information:
 Query: "{query_text}"
+{db_context}
 
 Extract:
-- origin_city (if mentioned, e.g. city name)
+- origin_city (if mentioned; prefer a city from the available list when it matches the user's intent)
 - destination_type (e.g., "warm beach", "mountain", "city", "cultural")
 - max_duration_hours (flight duration in hours)
 - max_price_eur (budget as number)
@@ -460,118 +532,205 @@ Extract:
 
 Return only a single JSON object with these keys. Use null for missing values. No markdown, no code block."""
 
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=model,
                 messages=[
                     {"role": "system",
                      "content": "You are a travel query parser. Reply with exactly one JSON object, no other text."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3
+                temperature=0.3,
+                timeout=60.0,
             )
-
-            raw = response.choices[0].message.content
-            result = AIVibeSearchService._extract_json_from_content(raw)
+            raw = response.choices[0].message.content if response.choices else None
+            if not raw:
+                logger.warning("AI search: empty response from LLM")
+                return AISearchService._simple_parse(query_text), 0.5
+            result = AISearchService._extract_json_from_content(raw)
             if result and isinstance(result, dict):
                 return result, 0.9
-            return AIVibeSearchService._simple_parse(query_text), 0.5
+            logger.debug("AI search: could not parse JSON from LLM response: %s", raw[:200] if raw else "")
+            return AISearchService._simple_parse(query_text), 0.5
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning("AI vibe parse failed: %s", e)
-            return AIVibeSearchService._simple_parse(query_text), 0.5
+            err_msg = str(e).lower()
+            if 'refused' in err_msg or 'connection' in err_msg:
+                model_name = (getattr(settings, 'AI_SEARCH_OLLAMA_MODEL', None) or '').strip() or 'model from .env'
+                logger.warning(
+                    "Ollama not running. Using keyword fallback. Start Ollama with your AI_SEARCH_OLLAMA_MODEL (%s).",
+                    model_name,
+                )
+            else:
+                logger.warning("AI search parse failed: %s", e, exc_info=True)
+            return AISearchService._simple_parse(query_text), 0.5
+
+    @staticmethod
+    def _parse_origin_keywords(query_text, query_lower):
+        """Extract origin_city from 'from X' or first word. Case-insensitive."""
+        import re
+        from_match = re.search(r'(?:from|flying from)\s+([a-z]+)', query_text, re.IGNORECASE)
+        if from_match:
+            return from_match.group(1).strip()
+        first_word = re.match(r'^\s*([a-z]+)', query_text, re.IGNORECASE)
+        if not first_word:
+            return None
+        w = first_word.group(1).strip()
+        stop = ('i', 'a', 'the', 'want', 'need', 'looking', 'for', 'to', 'my', 'me', 'hi', 'hello')
+        return w if w.lower() not in stop and len(w) > 1 else None
+
+    @staticmethod
+    def _parse_destination_weather_keywords(query_lower):
+        """Extract destination_type and weather_preference from keywords. Returns (dest_type, weather)."""
+        dest_type, weather = None, None
+        if 'beach' in query_lower or 'sea' in query_lower:
+            dest_type, weather = 'beach', 'warm'
+        elif 'mountain' in query_lower or 'ski' in query_lower:
+            dest_type, weather = 'mountain', 'snow'
+        elif 'city' in query_lower or 'cities' in query_lower:
+            dest_type = 'city'
+        if 'warm' in query_lower or 'sun' in query_lower or 'sunny' in query_lower:
+            weather = 'warm'
+        elif 'snow' in query_lower or 'cold' in query_lower:
+            weather = 'snow'
+        return dest_type, weather
 
     @staticmethod
     def _simple_parse(query_text):
-        """Simple keyword-based parsing fallback. Always returns a dict with expected keys."""
+        """Keyword-based parsing when Ollama is not used. Extracts origin, destination type, budget, duration, weather."""
         import re
-        query_lower = query_text.lower()
-        result = {
-            'origin_city': None,
-            'destination_type': None,
-            'max_duration_hours': None,
-            'max_price_eur': None,
-            'date_range_start': None,
-            'date_range_end': None,
+        empty = {
+            'origin_city': None, 'destination_type': None, 'max_duration_hours': None,
+            'max_price_eur': None, 'date_range_start': None, 'date_range_end': None,
             'weather_preference': None
         }
-
-        # Origin: "from Milan", "flying from Paris", "Milan" at start
-        from_match = re.search(r'(?:from|flying from)\s+([A-Z]+)', query_text, re.IGNORECASE)
-        if from_match:
-            result['origin_city'] = from_match.group(1).strip()
-        else:
-            # First word might be city (e.g. "Milan for under 300")
-            first_word = re.match(r'^\s*([A-Z]+)', query_text)
-            if first_word:
-                w = first_word.group(1)
-                if w.lower() not in ('i', 'a', 'the', 'want', 'need', 'looking', 'for', 'to', 'my', 'me'):
-                    result['origin_city'] = w
-
-        # Price
+        if not query_text or not str(query_text).strip():
+            return empty
+        query_lower = str(query_text).lower().strip()
+        result = dict(empty)
+        result['origin_city'] = AISearchService._parse_origin_keywords(query_text, query_lower)
         price_match = re.search(r'€?\s*(\d+)\s*(?:eur|euro|€|euros)?', query_lower)
         if price_match:
-            result['max_price_eur'] = float(price_match.group(1))
-
-        # Duration (e.g. "5 hour", "5-hour")
-        duration_match = re.search(r'(\d+)\s*-?\s*hour', query_lower)
+            try:
+                result['max_price_eur'] = float(price_match.group(1))
+            except (TypeError, ValueError):
+                pass
+        duration_match = re.search(r'(\d+)\s*-?\s*h(?:our)?s?', query_lower)
         if duration_match:
-            result['max_duration_hours'] = int(duration_match.group(1))
-
-        # Destination type
-        if 'beach' in query_lower:
-            result['destination_type'] = 'beach'
-            result['weather_preference'] = 'warm'
-        elif 'mountain' in query_lower:
-            result['destination_type'] = 'mountain'
-        elif 'city' in query_lower or 'cities' in query_lower:
-            result['destination_type'] = 'city'
-
+            try:
+                result['max_duration_hours'] = int(duration_match.group(1))
+            except (TypeError, ValueError):
+                pass
+        dest_type, weather = AISearchService._parse_destination_weather_keywords(query_lower)
+        if dest_type:
+            result['destination_type'] = dest_type
+        if weather:
+            result['weather_preference'] = weather
         return result
 
     @staticmethod
-    def search_by_vibe(parsed_query, user):
-        """Search flights based on parsed vibe query"""
-        # Create search record
-        search = TripSearch.objects.create(
-            user=user,
-            query_text=parsed_query.get('original_query', ''),
-            origin_city=parsed_query.get('origin_city'),
-            destination_type=parsed_query.get('destination_type'),
-            max_duration_hours=parsed_query.get('max_duration_hours'),
-            max_price_eur=parsed_query.get('max_price_eur'),
-            weather_preference=parsed_query.get('weather_preference'),
-            ai_parsed_data=parsed_query
-        )
+    def _departure_date_from_parsed(parsed_query):
+        """Return (date_str, date) for AI search. Uses date_range_start or default 7 days from today."""
+        start = parsed_query.get('date_range_start')
+        if start:
+            if isinstance(start, str):
+                try:
+                    dt = datetime.strptime(start[:10], '%Y-%m-%d')
+                    return start[:10], dt.date()
+                except ValueError:
+                    pass
+            if hasattr(start, 'strftime'):
+                return start.strftime('%Y-%m-%d'), start
+        default = datetime.now().date() + timedelta(days=7)
+        return default.strftime('%Y-%m-%d'), default
 
-        # Find matching airports based on destination type
-        matching_airports = AIVibeSearchService._find_matching_airports(
-            parsed_query)
+    @staticmethod
+    def _dest_airports_for_amadeus(parsed_query, origin_airport):
+        """Return list of destination airports for Amadeus: from DB (query match or flights from origin), else any airports in DB."""
+        matching = AISearchService._find_matching_airports(parsed_query, origin_airport)
+        dest = [a for a in matching[:10] if a.id != origin_airport.id]
+        if dest:
+            return dest
+        return list(Airport.objects.exclude(id=origin_airport.id)[:20])
 
-        # Find flights
-        origin_airport = None
-        if parsed_query.get('origin_city'):
-            origin_airport = Airport.objects.filter(
-                city__icontains=parsed_query['origin_city']).first()
+    @staticmethod
+    def _search_by_query_amadeus(parsed_query, origin_airport, max_price, max_minutes):
+        """Run AI search using Amadeus Flight Offers API. Returns list of match dicts."""
+        from api.amadeus_client import search_flight_offers_for_ai_search
+        date_str, _ = AISearchService._departure_date_from_parsed(parsed_query)
+        dest_airports = AISearchService._dest_airports_for_amadeus(parsed_query, origin_airport)
+        origin_dict = {
+            'iata_code': origin_airport.iata_code,
+            'name': origin_airport.name,
+            'city': getattr(origin_airport, 'city', '') or '',
+        }
+        all_offers = []
+        for dest_airport in dest_airports:
+            dest_dict = {
+                'iata_code': dest_airport.iata_code,
+                'name': dest_airport.name,
+                'city': getattr(dest_airport, 'city', '') or '',
+            }
+            offers = search_flight_offers_for_ai_search(
+                origin_airport.iata_code,
+                dest_airport.iata_code,
+                date_str,
+                origin_airport_dict=origin_dict,
+                destination_airport_dict=dest_dict,
+            )
+            all_offers.extend(
+                AISearchService._amadeus_offers_to_matches(
+                    offers, parsed_query, max_price, max_minutes)
+            )
+        all_offers.sort(key=lambda x: (x['match_score'], -x['total_trip_cost_eur']), reverse=True)
+        return all_offers[:3]
 
-        if not origin_airport:
-            return search, []
+    @staticmethod
+    def _amadeus_offers_to_matches(offers, parsed_query, max_price, max_minutes):
+        """Convert Amadeus offer dicts to match dicts, filtering by price/duration."""
+        out = []
+        for flight_dict in offers:
+            price_eur = float(flight_dict.get('price_eur', 0))
+            dur = int(flight_dict.get('duration_minutes', 0))
+            if price_eur <= max_price and dur <= max_minutes:
+                out.append({
+                    'flight': flight_dict,
+                    'match_score': AISearchService._calculate_match_score(flight_dict, parsed_query),
+                    'total_trip_cost_eur': price_eur,
+                    'total_trip_time_minutes': dur,
+                })
+        return out
 
+    @staticmethod
+    def _parse_budget_and_duration(parsed_query):
+        """Return (max_price, max_minutes) from parsed query. Coerces LLM strings."""
+        try:
+            max_price = float(parsed_query.get('max_price_eur') or 99999)
+        except (TypeError, ValueError):
+            max_price = 99999
+        try:
+            max_hours = int(parsed_query.get('max_duration_hours') or 24)
+        except (TypeError, ValueError):
+            max_hours = 24
+        return max_price, max_hours * 60
+
+    @staticmethod
+    def _search_by_query_db(search, parsed_query, origin_airport, max_price, max_minutes):
+        """Run AI search using flights in the database. Returns (search, options list of TripOption)."""
+        matching_airports = AISearchService._find_matching_airports(
+            parsed_query, origin_airport)
+        dest_airports = [a for a in matching_airports[:10] if a.id != origin_airport.id]
         options = []
-        for dest_airport in matching_airports[:10]:  # Top 10 matches
+        for dest_airport in dest_airports:
             flights = Flight.objects.filter(
                 origin_airport=origin_airport,
                 destination_airport=dest_airport,
-                price_eur__lte=parsed_query.get(
-                    'max_price_eur', 99999) or 99999,
-                duration_minutes__lte=(parsed_query.get(
-                    'max_duration_hours', 24) or 24) * 60
+                price_eur__lte=max_price,
+                duration_minutes__lte=max_minutes
             )[:3]
-
             for flight in flights:
-                # Calculate match score
-                match_score = AIVibeSearchService._calculate_match_score(
-                    flight, parsed_query)
-
+                match_score = AISearchService._calculate_match_score(flight, parsed_query)
                 option = TripOption.objects.create(
                     search=search,
                     flight=flight,
@@ -580,59 +739,156 @@ Return only a single JSON object with these keys. Use null for missing values. N
                     match_score=match_score
                 )
                 options.append(option)
-
-        # Rank options
         options.sort(key=lambda x: x.match_score, reverse=True)
         for i, option in enumerate(options[:3], 1):
             option.rank = i
             option.save()
-
         return search, options[:3]
 
     @staticmethod
-    def _find_matching_airports(parsed_query):
-        """Find airports matching destination type"""
-        # This would integrate with weather APIs and destination databases
-        # For now, return popular destinations
-        dest_type = parsed_query.get('destination_type', '').lower()
+    def search_by_query(parsed_query, user):
+        """Search flights based on parsed natural-language query. Uses Amadeus when configured, else flights in the database."""
+        search = TripSearch.objects.create(
+            user=user,
+            query_text=parsed_query.get('original_query') or '',
+            origin_city=parsed_query.get('origin_city') or '',
+            destination_type=parsed_query.get('destination_type') or '',
+            max_duration_hours=parsed_query.get('max_duration_hours'),
+            max_price_eur=parsed_query.get('max_price_eur'),
+            weather_preference=parsed_query.get('weather_preference') or '',
+            ai_parsed_data=parsed_query
+        )
+        origin_airport = AISearchService._resolve_origin_airport(
+            parsed_query.get('origin_city'))
+        if not origin_airport:
+            return search, []
 
-        if 'beach' in dest_type:
-            return Airport.objects.filter(
-                Q(city__icontains='Maldives') |
-                Q(city__icontains='Bali') |
-                Q(city__icontains='Cancun') |
-                Q(city__icontains='Phuket')
-            )
-        elif 'mountain' in dest_type:
-            return Airport.objects.filter(
-                Q(city__icontains='Zurich') |
-                Q(city__icontains='Innsbruck') |
-                Q(city__icontains='Geneva')
-            )
-        else:
-            return Airport.objects.all()[:20]
+        max_price, max_minutes = AISearchService._parse_budget_and_duration(parsed_query)
+
+        try:
+            from api.amadeus_client import is_configured as amadeus_configured
+        except ImportError:
+            amadeus_configured = lambda: False
+        if amadeus_configured():
+            try:
+                top = AISearchService._search_by_query_amadeus(
+                    parsed_query, origin_airport, max_price, max_minutes)
+                return search, top
+            except Exception:
+                import logging
+                logging.getLogger(__name__).warning(
+                    'AI search Amadeus call failed, falling back to DB', exc_info=True)
+
+        return AISearchService._search_by_query_db(
+            search, parsed_query, origin_airport, max_price, max_minutes)
+
+    @staticmethod
+    def _origin_airport_candidates(origin):
+        """Return list of Airport candidates for origin city name (city, name, or aliases)."""
+        candidates = list(Airport.objects.filter(city__icontains=origin))
+        if candidates:
+            return candidates
+        candidates = list(Airport.objects.filter(name__icontains=origin))
+        if candidates:
+            return candidates
+        aliases = {'milan': ['milano'], 'rome': ['roma'], 'munich': ['muenchen', 'münchen']}
+        lower = origin.lower()
+        for _city, alternates in aliases.items():
+            if lower != _city and lower not in alternates:
+                continue
+            for alt in [origin, _city] + alternates:
+                candidates = list(Airport.objects.filter(
+                    Q(city__icontains=alt) | Q(name__icontains=alt)
+                ))
+                if candidates:
+                    return candidates
+        return []
+
+    @staticmethod
+    def _resolve_origin_airport(origin_city):
+        """Resolve origin city name to an Airport. Prefers an airport that has outgoing flights in the database."""
+        if not origin_city or not str(origin_city).strip():
+            return None
+        import re
+        origin = str(origin_city).strip()
+        # Strip "from X" prefix so we match city name
+        origin = re.sub(r'^(?:from|flying from)\s+', '', origin, flags=re.IGNORECASE).strip() or origin
+        origin = re.sub(r'[.,;!?]+$', '', origin).strip() or origin  # trailing punctuation
+        if not origin:
+            return None
+        candidates = AISearchService._origin_airport_candidates(origin)
+        if not candidates:
+            return None
+        for airport in candidates:
+            if Flight.objects.filter(origin_airport=airport).exists():
+                return airport
+        return candidates[0]
+
+    @staticmethod
+    def _destination_type_keywords(dest_type):
+        """Return search keywords for destination type; used to query actual Airport table (no hardcoded city list)."""
+        if 'beach' in dest_type or 'sea' in dest_type:
+            return ['beach', 'maldives', 'bali', 'cancun', 'phuket', 'palma', 'malaga', 'tenerife', 'faro', 'dubrovnik']
+        if 'mountain' in dest_type or 'ski' in dest_type:
+            return ['zurich', 'innsbruck', 'geneva', 'chamonix', 'alps', 'salzburg', 'grenoble']
+        if 'city' in dest_type or 'cultural' in dest_type:
+            return ['paris', 'london', 'rome', 'berlin', 'madrid', 'barcelona', 'amsterdam', 'vienna']
+        return [dest_type] if dest_type else []
+
+    @staticmethod
+    def _find_matching_airports(parsed_query, origin_airport=None):
+        """Find airports from the actual database: match destination_type by keyword in Airport city/name, else use destinations that have flights from origin."""
+        dest_type = (parsed_query.get('destination_type') or '').lower()
+        weather_pref = (parsed_query.get('weather_preference') or '').lower()
+        if not dest_type and weather_pref:
+            if weather_pref in ('warm', 'sunny', 'sun'):
+                dest_type = 'beach'
+            elif weather_pref in ('snow', 'cold'):
+                dest_type = 'mountain'
+
+        keywords = AISearchService._destination_type_keywords(dest_type)
+        if keywords:
+            q = Q()
+            for k in keywords:
+                q |= Q(city__icontains=k) | Q(name__icontains=k)
+            qs = Airport.objects.filter(q).distinct()
+            if qs.exists():
+                return qs
+        # Use actual flights database: destinations that have at least one flight from origin
+        if origin_airport:
+            dest_ids = Flight.objects.filter(origin_airport=origin_airport).values_list(
+                'destination_airport_id', flat=True
+            ).distinct()
+            return Airport.objects.filter(id__in=dest_ids)
+        return Airport.objects.all()[:20]
 
     @staticmethod
     def _calculate_match_score(flight, parsed_query):
-        """Calculate how well flight matches query"""
+        """Calculate how well flight matches query. flight can be a Flight model or a dict with price_eur, duration_minutes."""
         score = 100.0
+        try:
+            max_price = float(parsed_query.get('max_price_eur') or 0)
+        except (TypeError, ValueError):
+            max_price = 0
+        try:
+            max_hours = int(parsed_query.get('max_duration_hours') or 0)
+        except (TypeError, ValueError):
+            max_hours = 0
 
-        # Price match
-        if parsed_query.get('max_price_eur'):
-            if flight.price_eur > parsed_query['max_price_eur']:
+        price_eur = float(flight.get('price_eur', 0) if isinstance(flight, dict) else getattr(flight, 'price_eur', 0))
+        duration_minutes = int(flight.get('duration_minutes', 0) if isinstance(flight, dict) else getattr(flight, 'duration_minutes', 0))
+
+        if max_price > 0:
+            if price_eur > max_price:
                 score -= 50
             else:
-                score += (1 - flight.price_eur /
-                          parsed_query['max_price_eur']) * 20
-
-        # Duration match
-        if parsed_query.get('max_duration_hours'):
-            max_minutes = parsed_query['max_duration_hours'] * 60
-            if flight.duration_minutes > max_minutes:
+                score += (1 - price_eur / max_price) * 20
+        if max_hours > 0:
+            max_minutes = max_hours * 60
+            if duration_minutes > max_minutes:
                 score -= 30
             else:
-                score += (1 - flight.duration_minutes / max_minutes) * 10
-
+                score += (1 - duration_minutes / max_minutes) * 10
         return max(0, min(100, score))
 
 

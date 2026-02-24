@@ -1,7 +1,10 @@
+import logging
+import requests
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import datetime, timedelta
@@ -19,10 +22,91 @@ from .serializers import (
 )
 from .services import (
     NearestAlternateService, MultiModalConnectionService,
-    AIVibeSearchService, CollaborativeService, DelayPredictionService,
+    AISearchService, CollaborativeService, DelayPredictionService,
     find_best_alternates_real,
 )
 from . import amadeus_client
+
+logger = logging.getLogger(__name__)
+
+
+def _attach_destination_weather(top_matches):
+    """Attach destination_weather to each match when weather API is configured."""
+    if not top_matches:
+        return
+    for match in top_matches:
+        match['destination_weather'] = None
+        try:
+            flight = match.get('flight') or {}
+            dest_airport = flight.get('destination_airport') or {}
+            city = dest_airport.get('city') or dest_airport.get('name')
+            if city:
+                match['destination_weather'] = _fetch_weather_for_city(city)
+        except Exception as e:
+            logger.debug('Weather for match: %s', e)
+
+
+def _ai_search_hint(parsed_query, has_matches, weather_configured, use_real_flights=False):
+    """Build hint when no matches or weather pref set but API not configured."""
+    hint = None
+    if not has_matches:
+        if not parsed_query.get('origin_city'):
+            hint = 'Include an origin city (e.g. "from Milan", "from Paris") to see flight results.'
+        else:
+            logger.info(
+                'AI search: no matches for origin_city=%s (parsed: %s)',
+                parsed_query.get('origin_city'),
+                parsed_query,
+            )
+            if use_real_flights:
+                hint = (
+                    'No flights found for this origin/date. Try another origin city or date. '
+                    'Ensure AMADEUS_API_KEY and AMADEUS_API_SECRET are set; run load_world_airports if needed.'
+                )
+            else:
+                hint = (
+                    'No flights found for this origin. Add airports and flights to the database, '
+                    'or set AMADEUS_API_KEY and AMADEUS_API_SECRET in .env for real flight search. '
+                    'Run python manage.py load_world_airports to load airports.'
+                )
+    if (parsed_query.get('weather_preference') or '').strip() and not weather_configured:
+        hint = (hint or '') + ' Set WEATHER_API_KEY in .env for weather-based destination matching.'
+    return hint
+
+
+# OpenWeatherMap current weather (api.openweathermap.org/data/2.5/weather)
+def _fetch_weather_for_city(city_name):
+    """Fetch current weather for a city. Returns dict with temp_c, description, icon or None on error."""
+    if not city_name or not str(city_name).strip():
+        return None
+    api_key = (getattr(settings, 'WEATHER_API_KEY', None) or '').strip()
+    if not api_key:
+        return None
+    try:
+        resp = requests.get(
+            'https://api.openweathermap.org/data/2.5/weather',
+            params={'q': str(city_name).strip(),
+                    'appid': api_key, 'units': 'metric'},
+            timeout=5,
+        )
+        if resp.status_code != 200:
+            logger.debug('Weather API non-200 for %s: %s',
+                         city_name, resp.status_code)
+            return None
+        data = resp.json()
+        main = data.get('main') or {}
+        weather_list = data.get('weather') or []
+        desc = weather_list[0].get('description', '') if weather_list else ''
+        icon = weather_list[0].get('icon', '') if weather_list else ''
+        temp = main.get('temp')
+        return {
+            'temp_c': round(float(temp), 1) if temp is not None else None,
+            'description': desc,
+            'icon': icon,
+        }
+    except Exception as e:
+        logger.debug('Weather API error for %s: %s', city_name, e)
+        return None
 
 
 @api_view(['GET'])
@@ -308,37 +392,58 @@ def multi_modal_search(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def vibe_search(request):
+def ai_search(request):
     """
-    Feature 3: AI-Driven "Vibe" Search
-    Natural language search for destinations
+    Feature 3: AI Search — natural language search for trips.
+    User writes free text; AI parses it and returns matching options.
     """
     query_text = request.data.get('query')
 
     if not query_text:
         return Response({'error': 'query required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Parse query with AI
-    parsed_query, confidence = AIVibeSearchService.parse_query_with_ai(
-        query_text)
+    # Use actual DB: pass available origin/destination cities so the model can normalize the query
+    available_origins = AISearchService.get_available_origin_cities()
+    available_destinations = AISearchService.get_available_destination_cities()
+    parsed_query, confidence = AISearchService.parse_query_with_ai(
+        query_text,
+        available_origin_cities=available_origins,
+        available_destination_cities=available_destinations,
+    )
     parsed_query['original_query'] = query_text
 
-    # Search by vibe (user is authenticated)
-    search, options = AIVibeSearchService.search_by_vibe(
-        parsed_query, request.user)
+    # Run AI search (user is authenticated); may return DB options or real-API match dicts
+    try:
+        search, options = AISearchService.search_by_query(
+            parsed_query, request.user)
+    except Exception as e:
+        logger.exception('AI search failed: %s', e)
+        return Response(
+            {'error': 'Search failed. Check server logs.', 'detail': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
     search_data = TripSearchSerializer(search).data
-    top_matches = [TripOptionSerializer(opt).data for opt in options]
-
-    hint = None
-    if not top_matches and not parsed_query.get('origin_city'):
-        hint = 'Include an origin city (e.g. "from Milan" or "Paris") to see flight results.'
-
+    # options are either TripOption instances (DB) or list of match dicts (Amadeus API)
+    if options and isinstance(options[0], dict):
+        top_matches = options
+    else:
+        top_matches = [TripOptionSerializer(opt).data for opt in options]
+    weather_configured = bool((getattr(settings, 'WEATHER_API_KEY', None) or '').strip())
+    if weather_configured:
+        _attach_destination_weather(top_matches)
+    use_real_flights = bool(options and isinstance(options[0], dict))
+    hint = _ai_search_hint(parsed_query, bool(top_matches), weather_configured, use_real_flights)
+    llm_backend = (getattr(settings, 'AI_SEARCH_LLM_BACKEND', None) or '').strip().lower() or None
     return Response({
         'search': search_data,
         'parsed_query': parsed_query,
         'ai_confidence': confidence,
+        'llm_backend': llm_backend,
+        'weather_configured': weather_configured,
         'top_matches': top_matches,
-        'hint': hint
+        'hint': hint,
+        'use_real_flights': use_real_flights,
     })
 
 

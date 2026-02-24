@@ -9,8 +9,10 @@ from core.models import UserProfile, Airport, TripOption, Flight, FlightConnecti
 from core.countries import COUNTRY_CHOICES
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
+from django.conf import settings
 from decimal import Decimal
 import json
+import requests
 
 
 @login_required
@@ -158,8 +160,13 @@ def profile_view(request):
         return redirect('profile')
 
     # Get saved trips
-    saved_trips = TripOption.objects.filter(
-        saved_by=request.user).order_by('-saved_at', '-created_at')
+    saved_trips = list(
+        TripOption.objects.filter(saved_by=request.user).order_by('-saved_at', '-created_at')
+    )
+    # Attach destination weather for each trip (non-persisted)
+    for trip in saved_trips:
+        city = trip.get_destination_city()
+        trip.destination_weather = _fetch_weather_for_city(city) if city else None
 
     # Get all airports for dropdown (world list; order by country, city, name)
     airports = Airport.objects.all().order_by('country', 'city', 'name')
@@ -171,6 +178,36 @@ def profile_view(request):
         'country_choices': COUNTRY_CHOICES,
     }
     return render(request, 'core/profile.html', context)
+
+
+def _fetch_weather_for_city(city_name):
+    """Fetch current weather for a city (OpenWeatherMap). Returns dict with temp_c, description, icon or None."""
+    if not city_name or not str(city_name).strip():
+        return None
+    api_key = (getattr(settings, 'WEATHER_API_KEY', None) or '').strip()
+    if not api_key:
+        return None
+    try:
+        resp = requests.get(
+            'https://api.openweathermap.org/data/2.5/weather',
+            params={'q': str(city_name).strip(), 'appid': api_key, 'units': 'metric'},
+            timeout=5,
+        )
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        main = data.get('main') or {}
+        weather_list = data.get('weather') or []
+        desc = weather_list[0].get('description', '') if weather_list else ''
+        icon = weather_list[0].get('icon', '') if weather_list else ''
+        temp = main.get('temp')
+        return {
+            'temp_c': round(float(temp), 1) if temp is not None else None,
+            'description': desc,
+            'icon': icon,
+        }
+    except Exception:
+        return None
 
 
 def _get_or_create_trip_option(data):

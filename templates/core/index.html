@@ -44,8 +44,8 @@
                 <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="multi-modal">
                     <i class="fas fa-train mr-2"></i>Multi-Modal
                 </button>
-                <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="vibe-search">
-                    <i class="fas fa-magic mr-2"></i>AI Vibe Search
+                <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="ai-search">
+                    <i class="fas fa-search mr-2"></i>AI Search
                 </button>
                 <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="collaborative">
                     <i class="fas fa-heart mr-2"></i>Collaborative
@@ -125,24 +125,24 @@
             <div id="multiModalResults" class="space-y-4"></div>
         </div>
 
-        <!-- Feature 3: AI Vibe Search -->
-        <div id="vibe-search" class="tab-content hidden">
+        <!-- Feature 3: AI Search -->
+        <div id="ai-search" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4">AI-Driven Vibe Search</h2>
-                <p class="text-gray-600 mb-6">Describe your dream trip in natural language</p>
+                <h2 class="text-2xl font-bold mb-4">AI Search</h2>
+                <p class="text-gray-600 mb-6">Write your trip in plain text — e.g. origin, destination type, budget, or dates.</p>
                 
-                <form id="vibeSearchForm" class="space-y-4">
+                <form id="aiSearchForm" class="space-y-4">
                     <div>
-                        <label for="vibe_query" class="block text-sm font-medium text-gray-700 mb-2">What are you looking for?</label>
-                        <textarea id="vibe_query" name="query" rows="3" placeholder='e.g., "I want a warm beach destination within a 5-hour flight of Milan for under €300 this weekend"'
+                        <label for="ai_query" class="block text-sm font-medium text-gray-700 mb-2">Describe your trip (free text)</label>
+                        <textarea id="ai_query" name="query" rows="3" placeholder='e.g., From Milan I want a warm beach under €300, max 5 hours flight'
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required></textarea>
                     </div>
                     <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
-                        <i class="fas fa-magic mr-2"></i>Find My Trip
+                        <i class="fas fa-search mr-2"></i>Search
                     </button>
                 </form>
             </div>
-            <div id="vibeSearchResults" class="space-y-4"></div>
+            <div id="aiSearchResults" class="space-y-4"></div>
         </div>
 
         <!-- Feature 4: Collaborative -->
@@ -361,6 +361,21 @@
             await sendSaveTripRequest({ flight_id: flightId, connection_id: connectionId });
         }
 
+        function saveTripFromAiSearch(idx) {
+            const matches = globalThis.lastAiSearchMatches || [];
+            const match = matches[idx];
+            if (!match) {
+                alert('Cannot save: no match data. Run the search again.');
+                return;
+            }
+            const offer = {
+                flight: match.flight || {},
+                total_trip_cost_eur: match.total_trip_cost_eur,
+                total_trip_time_minutes: match.total_trip_time_minutes == null ? ((match.flight && match.flight.duration_minutes) || 0) : match.total_trip_time_minutes
+            };
+            sendSaveTripRequest({ offer: offer });
+        }
+
         async function sendSaveTripRequest(payload) {
             try {
                 const response = await fetch('/api/save-trip/', {
@@ -446,32 +461,41 @@
             }
         }
 
-        // Feature 3: Vibe Search
-        document.getElementById('vibeSearchForm').addEventListener('submit', async (e) => {
+        // Feature 3: AI Search (uses Ollama/LLM when AI_SEARCH_LLM_BACKEND=ollama in .env)
+        document.getElementById('aiSearchForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
-            const resultsEl = document.getElementById('vibeSearchResults');
+            const resultsEl = document.getElementById('aiSearchResults');
             resultsEl.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Searching...</p>';
             try {
-                const response = await fetch(`${API_BASE}/vibe-search/`, {
+                const response = await fetch(`${API_BASE}/ai-search/`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
                     credentials: 'include',
                     body: JSON.stringify(data)
                 });
-                const result = await response.json();
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const msg = result.detail || result.error || response.statusText || 'Request failed';
+                    resultsEl.innerHTML = '<p class="text-red-600">' + msg + (response.status === 401 ? ' (log in and try again)' : '') + '</p>';
+                    return;
+                }
                 if (result.error) {
                     resultsEl.innerHTML = '<p class="text-red-600">' + (result.error || 'Request failed') + '</p>';
                     return;
                 }
-                displayVibeSearchResults(result);
+                globalThis.lastAiSearchMatches = result.top_matches || [];
+                displayAiSearchResults(result);
             } catch (error) {
                 resultsEl.innerHTML = '<p class="text-red-600">Error: ' + error.message + '</p>';
             }
         });
 
-        function formatVibeParsedQuery(pq) {
+        function formatAiSearchParsedQuery(pq) {
             if (!pq) return '';
             const parts = [];
             if (pq.origin_city) parts.push('From ' + pq.origin_city);
@@ -482,14 +506,14 @@
             return parts.length ? parts.join(' · ') : 'No filters extracted';
         }
 
-        function getVibeFlightMinutes(match) {
+        function getAiSearchFlightMinutes(match) {
             if (match.total_trip_time_minutes != null) return match.total_trip_time_minutes;
             const f = match.flight;
             if (f && f.duration_minutes != null) return f.duration_minutes;
             return 0;
         }
 
-        function getVibeFlightId(flight) {
+        function getAiSearchFlightId(flight) {
             if (typeof flight.id === 'number') return flight.id;
             if (typeof flight.id === 'string' && flight.id !== '') return flight.id;
             return null;
@@ -499,61 +523,85 @@
             return x !== undefined && x !== null;
         }
 
-        function buildVibeMatchCard(match, idx) {
+        function buildAiSearchWeatherLine(w) {
+            const hasTemp = w && w.temp_c != null;
+            const hasDesc = w && w.description;
+            if (hasTemp || hasDesc) {
+                const temp = hasTemp ? w.temp_c + '°C' : '';
+                const sep = temp && hasDesc ? ', ' : '';
+                return '<p class="text-sm text-blue-600"><i class="fas fa-cloud-sun mr-1"></i>' + temp + sep + (w.description || '') + '</p>';
+            }
+            return '';
+        }
+
+        function getAiSearchMatchCardParts(match, idx) {
             const flight = match.flight || {};
             const origin = (flight.origin_airport && flight.origin_airport.iata_code) || '—';
             const dest = (flight.destination_airport && flight.destination_airport.iata_code) || '—';
             const score = hasValue(match.match_score) ? Number(match.match_score).toFixed(1) : '—';
-            const costRaw = match.total_trip_cost_eur;
-            const cost = hasValue(costRaw) ? '€' + Number(costRaw).toFixed(2) : '—';
-            const minutes = getVibeFlightMinutes(match);
+            const cost = hasValue(match.total_trip_cost_eur) ? '€' + Number(match.total_trip_cost_eur).toFixed(2) : '—';
+            const minutes = getAiSearchFlightMinutes(match);
             const hasDuration = minutes > 0;
             const timeStr = hasDuration ? (Math.floor(minutes / 60) + 'h ' + (minutes % 60) + 'm') : '—';
             const dep = flight.departure_time ? new Date(flight.departure_time).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '';
             const arr = flight.arrival_time ? new Date(flight.arrival_time).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '';
-            const flightId = getVibeFlightId(flight);
             const airlinePart = flight.flight_number ? ' ' + flight.flight_number : '';
             const airlineLine = flight.airline ? '<p class="text-sm text-gray-500">' + flight.airline + airlinePart + '</p>' : '';
             const durationLine = hasDuration ? '<p>Duration: ' + timeStr + '</p>' : '';
-            const saveBtn = flightId
-                ? '<div><button onclick="saveTrip(' + flightId + ', null)" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"><i class="fas fa-bookmark mr-1"></i>Save Trip</button></div>'
-                : '';
+            const weatherLine = buildAiSearchWeatherLine(match.destination_weather);
+            const saveBtn = '<div><button onclick="saveTripFromAiSearch(' + idx + ')" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"><i class="fas fa-bookmark mr-1"></i>Save Trip</button></div>';
+            return { origin, dest, score, cost, airlineLine, durationLine, dep, arr, weatherLine, saveBtn };
+        }
+
+        function buildAiSearchMatchCard(match, idx) {
+            const p = getAiSearchMatchCardParts(match, idx);
+            const depLine = p.dep ? '<p>Dep: ' + p.dep + '</p>' : '';
+            const arrLine = p.arr ? '<p>Arr: ' + p.arr + '</p>' : '';
             return '<div class="bg-white rounded-lg shadow-md p-6 card-hover">' +
                 '<div class="flex justify-between items-start mb-3">' +
                 '<div><h3 class="text-xl font-bold">Match ' + (idx + 1) + '</h3>' +
-                '<p class="text-gray-600">' + origin + ' → ' + dest + '</p>' + airlineLine + '</div>' +
-                '<div class="text-right"><p class="text-2xl font-bold text-green-600">' + cost + '</p>' +
-                '<p class="text-sm text-gray-500">Match: ' + score + '%</p></div></div>' +
-                '<div class="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3">' + durationLine +
-                (dep ? '<p>Dep: ' + dep + '</p>' : '') + (arr ? '<p>Arr: ' + arr + '</p>' : '') + '</div>' + saveBtn + '</div>';
+                '<p class="text-gray-600">' + p.origin + ' → ' + p.dest + '</p>' + p.airlineLine + '</div>' +
+                '<div class="text-right"><p class="text-2xl font-bold text-green-600">' + p.cost + '</p>' +
+                '<p class="text-sm text-gray-500">Match: ' + p.score + '%</p></div></div>' +
+                '<div class="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3">' + p.durationLine + depLine + arrLine + p.weatherLine + '</div>' + p.saveBtn + '</div>';
         }
 
-        function displayVibeSearchResults(data) {
-            const container = document.getElementById('vibeSearchResults');
-            container.innerHTML = '';
+        function getAiSearchBackendLabel(llmBackend) {
+            if (llmBackend === 'ollama') return 'Parsed with Ollama';
+            if (llmBackend === 'groq') return 'Parsed with Groq';
+            return llmBackend ? 'Parsed with ' + llmBackend : '';
+        }
 
+        function buildAiSearchSummaryHtml(data) {
             const pq = data.parsed_query || {};
-            const hasConfidence = data.ai_confidence != null;
+            const hasConfidence = data.ai_confidence !== undefined && data.ai_confidence !== null;
             const confidence = hasConfidence ? (Number(data.ai_confidence) * 100).toFixed(0) + '%' : '';
-            const summary = formatVibeParsedQuery(pq);
-            const hasSummary = Boolean(summary || confidence);
-            if (hasSummary) {
+            const summary = formatAiSearchParsedQuery(pq);
+            const backendLabel = getAiSearchBackendLabel((data.llm_backend || '').toLowerCase());
+            const weatherLine = data.weather_configured ? '<p class="text-xs text-blue-600 mt-1"><i class="fas fa-cloud-sun mr-1"></i>Destination weather: on</p>' : '';
+            const hasContent = summary || confidence || backendLabel || data.weather_configured;
+            if (hasContent) {
                 const confLine = confidence ? '<p class="text-xs text-gray-500 mt-2">AI confidence: ' + confidence + '</p>' : '';
-                container.innerHTML = '<div class="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">' +
+                const backendLine = backendLabel ? '<p class="text-xs text-gray-600 mt-1">' + backendLabel + '</p>' : '';
+                return '<div class="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">' +
                     '<p class="font-medium text-gray-800">What we understood</p>' +
-                    '<p class="text-gray-600 text-sm mt-1">' + summary + '</p>' + confLine + '</div>';
+                    '<p class="text-gray-600 text-sm mt-1">' + summary + '</p>' + backendLine + confLine + weatherLine + '</div>';
             }
+            return '';
+        }
 
+        function buildAiSearchMatchesHtml(data) {
             const matches = data.top_matches || [];
             if (matches.length > 0) {
-                matches.forEach((match, idx) => {
-                    container.innerHTML += buildVibeMatchCard(match, idx);
-                });
-            } else {
-                let msg = 'No matches found. Try adjusting your query or add more flights to the database.';
-                if (data.hint) msg += ' ' + data.hint;
-                container.innerHTML += '<p class="text-gray-600">' + msg + '</p>';
+                return matches.map((match, idx) => buildAiSearchMatchCard(match, idx)).join('');
             }
+            const msg = data.hint || 'No matches found. Try adjusting your query or add more flights to the database.';
+            return '<p class="text-gray-600">' + msg + '</p>';
+        }
+
+        function displayAiSearchResults(data) {
+            const container = document.getElementById('aiSearchResults');
+            container.innerHTML = buildAiSearchSummaryHtml(data) + buildAiSearchMatchesHtml(data);
         }
 
         // Feature 4: Collaborative
