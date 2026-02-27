@@ -182,7 +182,7 @@ class SmartNearestAlternateSearchTest(TestCase):
         payload.update(overrides)
         return self.client.post(self.url, payload, format='json')
 
-    def _mock_search_flight_offers(self, origin_iata, destination_iata, departure_date, adults=1):
+    def _mock_search_flight_offers(self, origin_iata, destination_iata, departure_date, return_date=None, adults=1):
         if destination_iata != 'ZAG':
             return []
         offers = {
@@ -193,10 +193,12 @@ class SmartNearestAlternateSearchTest(TestCase):
         one = offers.get(origin_iata)
         if not one:
             return []
+        total_minutes = one['duration_minutes'] * 2 if return_date else one['duration_minutes']
         return [{
             'id': '{}-{}-offer'.format(origin_iata, destination_iata),
             'price_eur': one['price_eur'],
-            'duration_minutes': one['duration_minutes'],
+            'duration_minutes': total_minutes,
+            'trip_type': 'round_trip' if return_date else 'one_way',
             'airline': one['airline'],
             'number': one['number'],
         }]
@@ -247,3 +249,17 @@ class SmartNearestAlternateSearchTest(TestCase):
         self.assertIn('flight_cost_eur', first)
         self.assertIn('ground_cost_eur', first)
         self.assertIn('origin_distance_km', first)
+
+    def test_round_trip_requires_return_date(self):
+        r = self._search(trip_type='round_trip')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('return_date', r.json().get('error', ''))
+
+    def test_round_trip_uses_return_date(self):
+        return_date = (self.search_date + timedelta(days=5)).strftime('%Y-%m-%d')
+        r = self._search(trip_type='round_trip', return_date=return_date)
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data.get('trip_type'), 'round_trip')
+        first = data.get('results', [])[0]
+        self.assertEqual(first.get('flight', {}).get('trip_type'), 'round_trip')

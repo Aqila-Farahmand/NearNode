@@ -75,30 +75,37 @@
                             <input type="text" id="destination_query" name="destination_query" placeholder="{% trans 'e.g., Croatia or ZAG' %}" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
-                        <div>
-                            <label for="nearest_alternate_date" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Date" %}</label>
-                            <input type="date" id="nearest_alternate_date" name="date" required
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <div class="md:col-span-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="nearest_alternate_date" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Departure Date" %}</label>
+                                    <input type="date" id="nearest_alternate_date" name="date" required
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div id="returnDateWrap" class="hidden">
+                                    <label for="nearest_alternate_return_date" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Return Date" %}</label>
+                                    <input type="date" id="nearest_alternate_return_date" name="return_date"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
                         </div>
+                        <fieldset>
+                            <legend class="block text-sm font-medium text-gray-700 mb-2">{% trans "Trip Type" %}</legend>
+                            <div class="flex items-center gap-4 rounded-lg border border-gray-300 px-4 py-2">
+                                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                    <input type="radio" name="trip_type" value="one_way" checked class="text-blue-600 focus:ring-blue-500">
+                                    <span>{% trans "One Way" %}</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                    <input type="radio" name="trip_type" value="round_trip" class="text-blue-600 focus:ring-blue-500">
+                                    <span>{% trans "Round Trip" %}</span>
+                                </label>
+                            </div>
+                        </fieldset>
                         <div>
                             <label for="origin_radius_km" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Origin Radius (km)" %}</label>
                             <input type="number" id="origin_radius_km" name="origin_radius_km" value="220" min="10" max="800"
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label for="sort_by" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Sort By" %}</label>
-                            <select id="sort_by" name="sort_by" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                <option value="cost">{% trans "Total Cost" %}</option>
-                                <option value="duration">{% trans "Total Duration" %}</option>
-                                <option value="origin_distance_km">{% trans "Distance from Origin" %}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="sort_order" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Sort Order" %}</label>
-                            <select id="sort_order" name="sort_order" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                <option value="asc">{% trans "Ascending" %}</option>
-                                <option value="desc">{% trans "Descending" %}</option>
-                            </select>
                         </div>
                         <div>
                             <label for="max_results" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Max Results" %}</label>
@@ -273,7 +280,14 @@
             searchingFlights: "{% trans 'Searching flights...' %}",
             checkedOrigins: "{% trans 'Checked origins:' %}",
             checkedDestinations: "{% trans 'Checked destinations:' %}",
-            apiSort: "{% trans 'API sort:' %}"
+            returnDateRequired: "{% trans 'Return date is required for round trips.' %}",
+            oneWay: "{% trans 'One Way' %}",
+            roundTrip: "{% trans 'Round Trip' %}",
+            outbound: "{% trans 'Outbound' %}",
+            returnLeg: "{% trans 'Return' %}",
+            departs: "{% trans 'Departs' %}",
+            arrives: "{% trans 'Arrives' %}",
+            notAvailable: "{% trans 'N/A' %}"
         };
         
         // Tab switching
@@ -293,10 +307,41 @@
         });
 
         // Feature 1: Nearest Alternate
+        function syncRoundTripFields() {
+            const selected = document.querySelector('input[name="trip_type"]:checked');
+            const isRoundTrip = selected && selected.value === 'round_trip';
+            const returnWrap = document.getElementById('returnDateWrap');
+            const returnInput = document.getElementById('nearest_alternate_return_date');
+            const departureInput = document.getElementById('nearest_alternate_date');
+            if (!returnWrap || !returnInput) {
+                return;
+            }
+            if (departureInput && departureInput.value) {
+                returnInput.min = departureInput.value;
+            } else {
+                returnInput.removeAttribute('min');
+            }
+            returnWrap.classList.toggle('hidden', !isRoundTrip);
+            returnInput.required = !!isRoundTrip;
+            if (!isRoundTrip) {
+                returnInput.value = '';
+            }
+        }
+
+        document.querySelectorAll('input[name="trip_type"]').forEach((radio) => {
+            radio.addEventListener('change', syncRoundTripFields);
+        });
+        document.getElementById('nearest_alternate_date').addEventListener('change', syncRoundTripFields);
+        syncRoundTripFields();
+
         document.getElementById('nearestAlternateForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
+            if (data.trip_type === 'round_trip' && !data.return_date) {
+                alert(I18N.returnDateRequired);
+                return;
+            }
             if (!data.origin_airport_code) {
                 data.origin_airport_code = data.origin_query || '';
             }
@@ -357,10 +402,23 @@
             }
         }
 
+        function formatDateTime(value) {
+            if (!value) {
+                return I18N.notAvailable;
+            }
+            const dt = new Date(value);
+            if (Number.isNaN(dt.getTime())) {
+                return I18N.notAvailable;
+            }
+            return dt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+        }
+
         function buildNearestAlternateCard(result, idx, currencySymbol, exchangeRate) {
             const flight = result.flight || {};
             const origin = (flight.origin_airport && flight.origin_airport.iata_code) || '—';
             const dest = (flight.destination_airport && flight.destination_airport.iata_code) || '—';
+            const tripType = (result.trip_type || flight.trip_type || 'one_way');
+            const tripTypeLabel = tripType === 'round_trip' ? I18N.roundTrip : I18N.oneWay;
             const originAirport = result.origin_airport || flight.origin_airport || {};
             const destinationAirport = result.destination_airport || result.airport || flight.destination_airport || {};
             const originLabel = originAirport.name ? `${originAirport.name} (${originAirport.iata_code || origin})` : origin;
@@ -382,11 +440,34 @@
             const groundMinsOnly = groundMinutes % 60;
             const flightHours = Math.floor(flightMinutes / 60);
             const flightMinsOnly = flightMinutes % 60;
+            const outboundMinutes = Number(result.outbound_flight_duration_minutes || flight.outbound_duration_minutes || flightMinutes || 0);
+            const returnMinutes = Number(result.return_flight_duration_minutes || flight.return_duration_minutes || 0);
+            const outboundHours = Math.floor(outboundMinutes / 60);
+            const outboundMinsOnly = outboundMinutes % 60;
+            const returnHours = Math.floor(returnMinutes / 60);
+            const returnMinsOnly = returnMinutes % 60;
+            const outboundDep = formatDateTime(flight.departure_time);
+            const outboundArr = formatDateTime(flight.arrival_time);
+            const returnDep = formatDateTime(flight.return_departure_time);
+            const returnArr = formatDateTime(flight.return_arrival_time);
+            const outboundLine = `
+                <div class="text-xs text-blue-900 mt-2">
+                    <span class="font-semibold">${I18N.outbound}:</span>
+                    ${I18N.departs} ${outboundDep} · ${I18N.arrives} ${outboundArr} · ${outboundHours}h ${outboundMinsOnly}m
+                </div>
+            `;
+            const returnLine = tripType === 'round_trip' ? `
+                <div class="text-xs text-blue-900 mt-1">
+                    <span class="font-semibold">${I18N.returnLeg}:</span>
+                    ${I18N.departs} ${returnDep} · ${I18N.arrives} ${returnArr} · ${returnHours}h ${returnMinsOnly}m
+                </div>
+            ` : '';
             return `
                 <div class="bg-white rounded-lg shadow-md p-6 card-hover">
                     <div class="flex justify-between items-start mb-4">
                         <div>
                             <h3 class="text-xl font-bold">${I18N.option} ${idx + 1}</h3>
+                            <p class="text-sm text-blue-700 font-semibold">${tripTypeLabel}</p>
                             <p class="text-gray-700">${originLabel} <i class="fas fa-arrow-right mx-1 text-xs"></i> ${destinationLabel}</p>
                             <p class="text-sm text-gray-500">${originDistance} km ${I18N.fromYourLocation} · ${destinationDistance} km ${I18N.fromDestinationCenter}</p>
                         </div>
@@ -399,6 +480,8 @@
                         <span class="font-semibold">${I18N.groundLabel}</span> ${groundSummary} (${groundMode}) · ${groundHours}h ${groundMinsOnly}m
                         <span class="mx-2">|</span>
                         <span class="font-semibold">${I18N.flightLabel}</span> ${origin} → ${dest} · ${flightHours}h ${flightMinsOnly}m
+                        ${outboundLine}
+                        ${returnLine}
                     </div>
                     <div class="grid grid-cols-2 gap-4 mt-4">
                         <div>
@@ -523,11 +606,9 @@
                 return;
             }
 
-            const serverSortLabel = (data.sort_by || 'cost') + ' / ' + (data.sort_order || 'asc');
             container.innerHTML =
                 searchMetaHtml +
                 buildPostSearchSortBar(mode || 'best') +
-                '<div class="mb-3 text-sm text-gray-600">' + I18N.apiSort + ' <span class="font-semibold">' + serverSortLabel + '</span></div>' +
                 sorted.map((result, idx) => buildNearestAlternateCard(result, idx, currencySymbol, exchangeRate)).join('');
         }
 

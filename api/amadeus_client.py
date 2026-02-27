@@ -81,7 +81,7 @@ def get_token():
     return _token_cache['token']
 
 
-def _fetch_flight_offers_raw(origin_iata, destination_iata, departure_date, adults=1):
+def _fetch_flight_offers_raw(origin_iata, destination_iata, departure_date, return_date=None, adults=1):
     """Call Amadeus Flight Offers Search. Returns raw list of offer dicts from API."""
     token = get_token()
     if not token:
@@ -92,6 +92,8 @@ def _fetch_flight_offers_raw(origin_iata, destination_iata, departure_date, adul
         'departureDate': departure_date,
         'adults': adults,
     }
+    if return_date:
+        params['returnDate'] = return_date
     resp = requests.get(
         _flight_offers_url(),
         params=params,
@@ -104,12 +106,18 @@ def _fetch_flight_offers_raw(origin_iata, destination_iata, departure_date, adul
     return data.get('data') or []
 
 
-def search_flight_offers(origin_iata, destination_iata, departure_date, adults=1):
+def search_flight_offers(origin_iata, destination_iata, departure_date, return_date=None, adults=1):
     """
     Call Amadeus Flight Offers Search. Returns list of offer dicts with
     id, price_eur, duration_minutes, airline (first carrier), segments.
     """
-    offers = _fetch_flight_offers_raw(origin_iata, destination_iata, departure_date, adults)
+    offers = _fetch_flight_offers_raw(
+        origin_iata,
+        destination_iata,
+        departure_date,
+        return_date=return_date,
+        adults=adults,
+    )
     return [_map_one_offer(offer) for offer in offers]
 
 
@@ -118,7 +126,12 @@ def search_flight_offers_for_ai_search(origin_iata, destination_iata, departure_
     Same as search_flight_offers but returns flight dicts with origin_airport, destination_airport,
     departure_time, arrival_time for AI search / frontend display.
     """
-    offers = _fetch_flight_offers_raw(origin_iata, destination_iata, departure_date, adults)
+    offers = _fetch_flight_offers_raw(
+        origin_iata,
+        destination_iata,
+        departure_date,
+        adults=adults,
+    )
     origin = origin_airport_dict or {'iata_code': origin_iata[:3], 'name': origin_iata, 'city': ''}
     dest = destination_airport_dict or {'iata_code': destination_iata[:3], 'name': destination_iata, 'city': ''}
     return [_map_one_offer_rich(offer, origin, dest) for offer in offers]
@@ -140,26 +153,63 @@ def _map_one_offer_rich(offer, origin_airport_dict, destination_airport_dict):
     return base
 
 
-def _map_one_offer(offer):
-    """Map one Amadeus flight offer to our minimal flight dict."""
+def _price_total_eur(offer):
     price = offer.get('price', {}) or {}
     try:
-        price_eur = float(price.get('total', '0'))
+        return float(price.get('total', '0'))
     except (TypeError, ValueError):
-        price_eur = 0.0
+        return 0.0
+
+
+def _itinerary_at(itineraries, idx):
+    return itineraries[idx] if len(itineraries) > idx else {}
+
+
+def _segments_for_itinerary(itinerary):
+    return (itinerary.get('segments') or []) if itinerary else []
+
+
+def _segment_time(segment, side):
+    return (segment.get(side) or {}).get('at', '') if segment else ''
+
+
+def _airline_from_segment(segment):
+    operating = segment.get('operating') or {}
+    operating_code = operating.get('carrierCode') if isinstance(operating, dict) else None
+    return operating_code or segment.get('carrierCode', '') or 'Airline'
+
+
+def _map_one_offer(offer):
+    """Map one Amadeus flight offer to our minimal flight dict."""
+    price_eur = _price_total_eur(offer)
     itineraries = offer.get('itineraries') or []
-    duration_str = (itineraries[0].get('duration') or 'PT0M')[2:] if itineraries else 'PT0M'
-    duration_minutes = _parse_iso_duration(duration_str)
-    segments = (itineraries[0].get('segments') or []) if itineraries else []
+    outbound = _itinerary_at(itineraries, 0)
+    inbound = _itinerary_at(itineraries, 1)
+    outbound_duration_minutes = _parse_iso_duration(outbound.get('duration') or 'PT0M')
+    return_duration_minutes = _parse_iso_duration(inbound.get('duration') or 'PT0M')
+    duration_minutes = outbound_duration_minutes + return_duration_minutes
+    segments = _segments_for_itinerary(outbound)
     seg0 = segments[0] if segments else {}
-    operating = seg0.get('operating') or {}
-    airline = (operating.get('carrierCode') if isinstance(operating, dict) else None) or seg0.get('carrierCode', '') or 'Airline'
+    airline = _airline_from_segment(seg0)
+    first_outbound = segments[0] if segments else {}
+    last_outbound = segments[-1] if segments else {}
+    inbound_segments = _segments_for_itinerary(inbound)
+    first_inbound = inbound_segments[0] if inbound_segments else {}
+    last_inbound = inbound_segments[-1] if inbound_segments else {}
+    offer_id = offer.get('id', '') or ''
     return {
         'id': offer.get('id'),
         'price_eur': price_eur,
         'duration_minutes': duration_minutes,
+        'outbound_duration_minutes': outbound_duration_minutes,
+        'return_duration_minutes': return_duration_minutes,
+        'trip_type': 'round_trip' if inbound else 'one_way',
         'airline': airline,
-        'number': seg0.get('number', '') or (offer.get('id', '')[:6]),
+        'number': seg0.get('number', '') or offer_id[:6],
+        'departure_time': _segment_time(first_outbound, 'departure'),
+        'arrival_time': _segment_time(last_outbound, 'arrival'),
+        'return_departure_time': _segment_time(first_inbound, 'departure'),
+        'return_arrival_time': _segment_time(last_inbound, 'arrival'),
     }
 
 

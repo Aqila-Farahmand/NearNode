@@ -276,15 +276,17 @@ class SmartNearbyAirportService:
         return None
 
     @staticmethod
-    def _flight_candidates(origin_airport, destination_airport, search_date, use_real_api):
+    def _flight_candidates(origin_airport, destination_airport, search_date, use_real_api, trip_type='one_way', return_date=None):
         if not use_real_api:
             return []
         from api.amadeus_client import search_flight_offers
         return [
             {'type': 'offer', 'data': offer}
             for offer in search_flight_offers(
-                origin_airport.iata_code, destination_airport.iata_code, search_date.strftime(
-                    '%Y-%m-%d')
+                origin_airport.iata_code,
+                destination_airport.iata_code,
+                search_date.strftime('%Y-%m-%d'),
+                return_date=return_date.strftime('%Y-%m-%d') if trip_type == 'round_trip' and return_date else None,
             )
         ]
 
@@ -316,8 +318,15 @@ class SmartNearbyAirportService:
                 'airline': offer.get('airline', ''),
                 'price_eur': flight_cost,
                 'duration_minutes': flight_duration,
+                'outbound_duration_minutes': int(_safe_float(offer.get('outbound_duration_minutes'), 0)),
+                'return_duration_minutes': int(_safe_float(offer.get('return_duration_minutes'), 0)),
+                'trip_type': offer.get('trip_type') or 'one_way',
                 'origin_airport': {'iata_code': origin_airport.iata_code, 'name': origin_airport.name},
                 'destination_airport': {'iata_code': destination_airport.iata_code, 'name': destination_airport.name},
+                'departure_time': offer.get('departure_time') or '',
+                'arrival_time': offer.get('arrival_time') or '',
+                'return_departure_time': offer.get('return_departure_time') or '',
+                'return_arrival_time': offer.get('return_arrival_time') or '',
             }
             flight_id = offer.get('id')
 
@@ -373,7 +382,7 @@ class SmartNearbyAirportService:
         }
 
     @staticmethod
-    def _collect_results_for_origins(origins, destinations, resolved_origin, date_obj, use_real_api, destination_coords):
+    def _collect_results_for_origins(origins, destinations, resolved_origin, date_obj, use_real_api, destination_coords, trip_type='one_way', return_date=None):
         results = []
         origins_with_ground = []
         origins_without_ground = []
@@ -390,7 +399,7 @@ class SmartNearbyAirportService:
                 if destination_airport.id == origin_airport.id:
                     continue
                 for candidate in SmartNearbyAirportService._flight_candidates(
-                        origin_airport, destination_airport, date_obj, use_real_api):
+                        origin_airport, destination_airport, date_obj, use_real_api, trip_type, return_date):
                     results.append(
                         SmartNearbyAirportService._build_result(
                             origin_info, destination_airport, candidate, ground_leg, destination_coords
@@ -401,12 +410,15 @@ class SmartNearbyAirportService:
     @staticmethod
     def search(origin_query, destination_query, search_date, origin_radius_km=200,
                destination_radius_km=150, sort_by='cost', sort_order='asc', max_results=30,
+               trip_type='one_way', return_date=None,
                return_meta=False):
         resolved_origin = SmartNearbyAirportService._resolve_origin_point(
             origin_query)
         if not resolved_origin:
             return SmartNearbyAirportService._search_return([], return_meta)
         date_obj = SmartNearbyAirportService._normalize_date(search_date)
+        return_date_obj = SmartNearbyAirportService._normalize_date(
+            return_date) if return_date else None
         origins = SmartNearbyAirportService._find_origin_airports(
             resolved_origin['lat'], resolved_origin['lon'], origin_radius_km
         )
@@ -423,7 +435,14 @@ class SmartNearbyAirportService:
         destination_codes = [
             airport.iata_code for airport in destinations_limited]
         results, origins_with_ground, origins_without_ground = SmartNearbyAirportService._collect_results_for_origins(
-            origins, destinations_limited, resolved_origin, date_obj, use_real_api, destination_coords
+            origins,
+            destinations_limited,
+            resolved_origin,
+            date_obj,
+            use_real_api,
+            destination_coords,
+            trip_type=trip_type,
+            return_date=return_date_obj,
         )
         sorted_results = SmartNearbyAirportService._sort_results(
             results, sort_by, sort_order)[:max_results]

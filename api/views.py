@@ -218,6 +218,63 @@ class FlightViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
 
+def _nearest_alternate_bad_request(message):
+    return Response({'error': message}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _nearest_alternate_request_params(data):
+    origin_airport_code = data.get('origin_airport_code')
+    final_destination_address = data.get('final_destination_address')
+    radius_km = float(data.get('radius_km', 100))
+    return {
+        'origin_query': data.get('origin_query') or origin_airport_code,
+        'destination_query': data.get('destination_query') or final_destination_address,
+        'date_str': data.get('date'),
+        'origin_radius_km': float(data.get('origin_radius_km', radius_km)),
+        'destination_radius_km': float(data.get('destination_radius_km', radius_km)),
+        'sort_by': (data.get('sort_by') or 'cost').strip().lower(),
+        'sort_order': (data.get('sort_order') or 'asc').strip().lower(),
+        'max_results': int(data.get('max_results', 30)),
+        'trip_type': (data.get('trip_type') or 'one_way').strip().lower(),
+        'return_date_str': (data.get('return_date') or '').strip(),
+    }
+
+
+def _validate_nearest_alternate_dates(params):
+    if not all([params['origin_query'], params['destination_query'], params['date_str']]):
+        return None, None, 'origin_query/destination_query/date are required (legacy: origin_airport_code/final_destination_address/date).'
+    try:
+        departure_date = datetime.strptime(params['date_str'], '%Y-%m-%d').date()
+    except ValueError:
+        return None, None, 'Invalid date format. Use YYYY-MM-DD'
+
+    trip_type = params['trip_type']
+    if trip_type not in ('one_way', 'round_trip'):
+        return None, None, 'trip_type must be one_way or round_trip'
+    if trip_type != 'round_trip':
+        return departure_date, None, None
+
+    return_date_str = params['return_date_str']
+    if not return_date_str:
+        return None, None, 'return_date is required for round trips'
+    try:
+        return_date = datetime.strptime(return_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return None, None, 'Invalid return_date format. Use YYYY-MM-DD'
+    if return_date < departure_date:
+        return None, None, 'return_date must be on or after departure date'
+    return departure_date, return_date, None
+
+
+def _nearest_alternate_currency_for_user(user):
+    if not user.is_authenticated:
+        return 'EUR'
+    try:
+        return user.profile.currency
+    except (UserProfile.DoesNotExist, AttributeError):
+        return 'EUR'
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def nearest_alternate_search(request):
@@ -225,61 +282,32 @@ def nearest_alternate_search(request):
     Feature 1: Nearest Alternate Optimization
     Search for airports within radius and calculate total trip cost/time
     """
-    origin_airport_code = request.data.get('origin_airport_code')
-    final_destination_address = request.data.get('final_destination_address')
-    origin_query = request.data.get('origin_query') or origin_airport_code
-    destination_query = request.data.get('destination_query') or final_destination_address
-    date_str = request.data.get('date')
-    radius_km = float(request.data.get('radius_km', 100))
-    origin_radius_km = float(request.data.get('origin_radius_km', radius_km))
-    destination_radius_km = float(request.data.get('destination_radius_km', radius_km))
-    sort_by = (request.data.get('sort_by') or 'cost').strip().lower()
-    sort_order = (request.data.get('sort_order') or 'asc').strip().lower()
-    max_results = int(request.data.get('max_results', 30))
-
-    if not all([origin_query, destination_query, date_str]):
-        return Response(
-            {'error': 'origin_query/destination_query/date are required (legacy: origin_airport_code/final_destination_address/date).'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    try:
-        date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    except ValueError:
-        return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
-
+    params = _nearest_alternate_request_params(request.data)
+    departure_date, return_date, validation_error = _validate_nearest_alternate_dates(params)
+    if validation_error:
+        return _nearest_alternate_bad_request(validation_error)
     if not amadeus_client.is_configured():
-        return Response(
-            {'error': 'Real flight search requires AMADEUS_API_KEY and AMADEUS_API_SECRET.'},
-            status=status.HTTP_400_BAD_REQUEST
+        return _nearest_alternate_bad_request(
+            'Real flight search requires AMADEUS_API_KEY and AMADEUS_API_SECRET.'
         )
 
     smart_search = SmartNearbyAirportService.search(
-        origin_query=origin_query,
-        destination_query=destination_query,
-        search_date=date,
-        origin_radius_km=origin_radius_km,
-        destination_radius_km=destination_radius_km,
-        sort_by=sort_by,
-        sort_order=sort_order,
-        max_results=max_results,
+        origin_query=params['origin_query'],
+        destination_query=params['destination_query'],
+        search_date=departure_date,
+        origin_radius_km=params['origin_radius_km'],
+        destination_radius_km=params['destination_radius_km'],
+        sort_by=params['sort_by'],
+        sort_order=params['sort_order'],
+        max_results=params['max_results'],
+        trip_type=params['trip_type'],
+        return_date=return_date,
         return_meta=True,
     )
     results = smart_search.get('results', [])
     search_meta = smart_search.get('meta', {})
-    # Get user's currency preference if authenticated
-    currency = 'EUR'
-    if request.user.is_authenticated:
-        try:
-            profile = request.user.profile
-            currency = profile.currency
-        except (UserProfile.DoesNotExist, AttributeError):
-            pass
-
-    # Convert prices to user's currency (simplified - in production, use real exchange rates)
-    exchange_rates = _exchange_rates_to_eur()
-    rate = exchange_rates.get(currency, 1.0)
-
+    currency = _nearest_alternate_currency_for_user(request.user)
+    rate = _exchange_rates_to_eur().get(currency, 1.0)
     use_real_api = amadeus_client.is_configured()
     serialized_results = [
         _serialize_one_alternate(result, rate, currency, use_real_api)
@@ -290,13 +318,18 @@ def nearest_alternate_search(request):
         'results': serialized_results,
         'count': len(serialized_results),
         'currency': currency,
-        'sort_by': sort_by,
-        'sort_order': sort_order,
+        'sort_by': params['sort_by'],
+        'sort_order': params['sort_order'],
+        'trip_type': params['trip_type'],
+        'return_date': params['return_date_str'] if params['trip_type'] == 'round_trip' else None,
         'search_meta': search_meta,
     }
-    if len(serialized_results) == 0:
+    if not serialized_results:
         payload['hint'] = _smart_search_empty_hint(
-            origin_query, destination_query, origin_radius_km, search_meta
+            params['origin_query'],
+            params['destination_query'],
+            params['origin_radius_km'],
+            search_meta,
         )
     return Response(payload)
 
@@ -315,6 +348,14 @@ def _serialize_one_alternate(result, rate, currency, use_real_api):
     ground_duration = _alternate_duration_minutes(
         result, 'ground_time_minutes', ground_data, 'duration_minutes'
     )
+    outbound_flight_duration = _as_float(
+        result.get('outbound_flight_time_minutes'),
+        _as_float((flight_data or {}).get('outbound_duration_minutes', 0) if isinstance(flight_data, dict) else 0),
+    )
+    return_flight_duration = _as_float(
+        result.get('return_flight_time_minutes'),
+        _as_float((flight_data or {}).get('return_duration_minutes', 0) if isinstance(flight_data, dict) else 0),
+    )
     return {
         'flight': flight_data,
         'flight_leg': flight_data,
@@ -329,10 +370,13 @@ def _serialize_one_alternate(result, rate, currency, use_real_api):
         'total_trip_cost_eur': total_cost,
         'total_trip_cost_converted': total_cost * rate,
         'currency': currency,
+        'trip_type': result.get('trip_type') or (flight_data.get('trip_type') if isinstance(flight_data, dict) else 'one_way') or 'one_way',
         'total_trip_time_minutes': result['total_time_minutes'],
         'flight_cost_eur': float(result['flight_cost']),
         'ground_cost_eur': ground_cost,
         'flight_duration_minutes': flight_duration,
+        'outbound_flight_duration_minutes': int(outbound_flight_duration or 0),
+        'return_flight_duration_minutes': int(return_flight_duration or 0),
         'ground_duration_minutes': ground_duration,
     }
 
