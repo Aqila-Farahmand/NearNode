@@ -2,7 +2,7 @@
 Service layer for business logic
 """
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 import httpx
 import openai
@@ -142,6 +142,301 @@ class NearestAlternateService:
         return results
 
 
+def _safe_float(value, default=0.0):
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+class SmartNearbyAirportService:
+    """Smart nearby-origin optimizer combining ground + flight legs."""
+
+    @staticmethod
+    def _looks_like_iata(value):
+        text = (value or '').strip()
+        return len(text) == 3 and text.isalpha()
+
+    @staticmethod
+    def _normalize_date(search_date):
+        if isinstance(search_date, date):
+            return search_date
+        if isinstance(search_date, str):
+            return datetime.strptime(search_date, '%Y-%m-%d').date()
+        raise ValueError('Invalid date input')
+
+    @staticmethod
+    def _resolve_origin_point(origin_query):
+        origin = (origin_query or '').strip()
+        if not origin:
+            return None
+        if SmartNearbyAirportService._looks_like_iata(origin):
+            airport = Airport.objects.filter(iata_code=origin.upper()).first()
+            if airport:
+                return {
+                    'lat': float(airport.latitude),
+                    'lon': float(airport.longitude),
+                    'label': '{} ({})'.format(airport.name, airport.iata_code),
+                    'airport': airport,
+                }
+        airport = (
+            Airport.objects.filter(
+                Q(city__iexact=origin) | Q(name__icontains=origin)
+            ).order_by('name').first()
+        )
+        if airport:
+            return {
+                'lat': float(airport.latitude),
+                'lon': float(airport.longitude),
+                'label': '{} ({})'.format(airport.name, airport.iata_code),
+                'airport': airport,
+            }
+        lat, lon = NearestAlternateService.geocode_address(origin)
+        if lat is None or lon is None:
+            return None
+        return {'lat': float(lat), 'lon': float(lon), 'label': origin, 'airport': None}
+
+    @staticmethod
+    def _find_origin_airports(origin_lat, origin_lon, radius_km=200, limit=12):
+        candidates = []
+        for airport in Airport.objects.all():
+            distance = geodesic(
+                (origin_lat, origin_lon),
+                (float(airport.latitude), float(airport.longitude))
+            ).kilometers
+            if distance <= radius_km:
+                candidates.append({
+                    'airport': airport,
+                    'origin_distance_km': distance,
+                })
+        candidates.sort(key=lambda x: x['origin_distance_km'])
+        return candidates[:limit]
+
+    @staticmethod
+    def _resolve_destination_airports(destination_query, destination_radius_km=150, limit=12):
+        query = (destination_query or '').strip()
+        if not query:
+            return [], None
+        if SmartNearbyAirportService._looks_like_iata(query):
+            airport = Airport.objects.filter(iata_code=query.upper()).first()
+            return ([airport] if airport else []), (
+                (float(airport.latitude), float(
+                    airport.longitude)) if airport else None
+            )
+
+        exact_country = Airport.objects.filter(country__iexact=query)
+        if exact_country.exists():
+            return list(exact_country.order_by('name')[:limit]), None
+
+        city_or_name = Airport.objects.filter(
+            Q(city__icontains=query) | Q(name__icontains=query)
+        )
+        if city_or_name.exists():
+            return list(city_or_name.order_by('name')[:limit]), None
+
+        loose_country = Airport.objects.filter(country__icontains=query)
+        if loose_country.exists():
+            return list(loose_country.order_by('name')[:limit]), None
+
+        lat, lon = NearestAlternateService.geocode_address(query)
+        if lat is None or lon is None:
+            return [], None
+        nearby = NearestAlternateService.find_airports_in_radius(
+            float(lat), float(lon), destination_radius_km
+        )
+        return [item['airport'] for item in nearby[:limit]], (float(lat), float(lon))
+
+    @staticmethod
+    def _pick_ground_leg(origin_lat, origin_lon, origin_airport):
+        from api import ground_transport_client as gtc
+        direct_distance = geodesic(
+            (origin_lat, origin_lon),
+            (float(origin_airport.latitude), float(origin_airport.longitude)),
+        ).kilometers
+        # If user is already near this departure airport, no ground transfer is needed.
+        if direct_distance <= 25:
+            return {
+                'duration_minutes': 0,
+                'cost_eur': 0.0,
+                'estimated_cost_eur': 0.0,
+                'distance_km': round(direct_distance, 2),
+                'mode': 'none',
+                'name': 'Already near departure airport',
+                'transport_type': 'walk',
+                'provider': 'none',
+            }
+        options = gtc.get_ground_options(
+            origin_lat, origin_lon,
+            float(origin_airport.latitude), float(origin_airport.longitude),
+        )
+        if options:
+            return options[0]
+        return None
+
+    @staticmethod
+    def _flight_candidates(origin_airport, destination_airport, search_date, use_real_api):
+        if not use_real_api:
+            return []
+        from api.amadeus_client import search_flight_offers
+        return [
+            {'type': 'offer', 'data': offer}
+            for offer in search_flight_offers(
+                origin_airport.iata_code, destination_airport.iata_code, search_date.strftime(
+                    '%Y-%m-%d')
+            )
+        ]
+
+    @staticmethod
+    def _build_result(origin_info, destination_airport, flight_candidate, ground_leg, destination_coords):
+        origin_airport = origin_info['airport']
+        origin_distance = origin_info['origin_distance_km']
+        ground_cost = _safe_float(ground_leg.get('cost_eur'), None)
+        if ground_cost is None:
+            ground_cost = _safe_float(
+                ground_leg.get('estimated_cost_eur'), 0.0)
+        ground_duration = int(_safe_float(
+            ground_leg.get('duration_minutes'), 0))
+
+        if flight_candidate['type'] == 'flight':
+            flight = flight_candidate['data']
+            flight_cost = _safe_float(flight.price_eur, 0.0)
+            flight_duration = int(_safe_float(flight.duration_minutes, 0))
+            flight_payload = flight
+            flight_id = flight.id
+        else:
+            offer = flight_candidate['data']
+            flight_cost = _safe_float(offer.get('price_eur'), 0.0)
+            flight_duration = int(_safe_float(
+                offer.get('duration_minutes'), 0))
+            flight_payload = {
+                'id': offer.get('id'),
+                'flight_number': offer.get('number', ''),
+                'airline': offer.get('airline', ''),
+                'price_eur': flight_cost,
+                'duration_minutes': flight_duration,
+                'origin_airport': {'iata_code': origin_airport.iata_code, 'name': origin_airport.name},
+                'destination_airport': {'iata_code': destination_airport.iata_code, 'name': destination_airport.name},
+            }
+            flight_id = offer.get('id')
+
+        destination_distance_km = 0.0
+        if destination_coords:
+            destination_distance_km = geodesic(
+                destination_coords,
+                (float(destination_airport.latitude),
+                 float(destination_airport.longitude))
+            ).kilometers
+
+        return {
+            'origin_airport': origin_airport,
+            'airport': destination_airport,
+            'destination_airport': destination_airport,
+            'flight': flight_payload,
+            'flight_id': flight_id,
+            'ground_transport': ground_leg,
+            'origin_distance_km': origin_distance,
+            'distance_to_destination_km': destination_distance_km,
+            'flight_cost': flight_cost,
+            'ground_cost': ground_cost,
+            'total_cost_eur': flight_cost + ground_cost,
+            'flight_time_minutes': flight_duration,
+            'ground_time_minutes': ground_duration,
+            'total_time_minutes': flight_duration + ground_duration,
+        }
+
+    @staticmethod
+    def _sort_results(results, sort_by='cost', sort_order='asc'):
+        sort_key = (sort_by or 'cost').lower()
+        reverse = (sort_order or 'asc').lower() == 'desc'
+        if sort_key in ('duration', 'total_duration'):
+            def key(x): return (x['total_time_minutes'], x['total_cost_eur'])
+        elif sort_key in ('radius', 'distance', 'origin_distance_km'):
+            def key(x): return (x['origin_distance_km'], x['total_cost_eur'])
+        else:
+            def key(x): return (x['total_cost_eur'], x['total_time_minutes'])
+        return sorted(results, key=key, reverse=reverse)
+
+    @staticmethod
+    def _search_return(results, return_meta, origin_codes=None, destination_codes=None, origins_with_ground=None, origins_without_ground=None):
+        if not return_meta:
+            return results
+        return {
+            'results': results,
+            'meta': {
+                'origin_airports_considered': origin_codes or [],
+                'destination_airports_considered': destination_codes or [],
+                'origin_airports_with_ground': origins_with_ground or [],
+                'origin_airports_without_ground': origins_without_ground or [],
+            }
+        }
+
+    @staticmethod
+    def _collect_results_for_origins(origins, destinations, resolved_origin, date_obj, use_real_api, destination_coords):
+        results = []
+        origins_with_ground = []
+        origins_without_ground = []
+        for origin_info in origins:
+            origin_airport = origin_info['airport']
+            ground_leg = SmartNearbyAirportService._pick_ground_leg(
+                resolved_origin['lat'], resolved_origin['lon'], origin_airport
+            )
+            if ground_leg is None:
+                origins_without_ground.append(origin_airport.iata_code)
+                continue
+            origins_with_ground.append(origin_airport.iata_code)
+            for destination_airport in destinations:
+                if destination_airport.id == origin_airport.id:
+                    continue
+                for candidate in SmartNearbyAirportService._flight_candidates(
+                        origin_airport, destination_airport, date_obj, use_real_api):
+                    results.append(
+                        SmartNearbyAirportService._build_result(
+                            origin_info, destination_airport, candidate, ground_leg, destination_coords
+                        )
+                    )
+        return results, origins_with_ground, origins_without_ground
+
+    @staticmethod
+    def search(origin_query, destination_query, search_date, origin_radius_km=200,
+               destination_radius_km=150, sort_by='cost', sort_order='asc', max_results=30,
+               return_meta=False):
+        resolved_origin = SmartNearbyAirportService._resolve_origin_point(
+            origin_query)
+        if not resolved_origin:
+            return SmartNearbyAirportService._search_return([], return_meta)
+        date_obj = SmartNearbyAirportService._normalize_date(search_date)
+        origins = SmartNearbyAirportService._find_origin_airports(
+            resolved_origin['lat'], resolved_origin['lon'], origin_radius_km
+        )
+        origin_codes = [item['airport'].iata_code for item in origins]
+        destinations, destination_coords = SmartNearbyAirportService._resolve_destination_airports(
+            destination_query, destination_radius_km
+        )
+        if not destinations:
+            return SmartNearbyAirportService._search_return([], return_meta, origin_codes, [])
+
+        from . import amadeus_client
+        use_real_api = amadeus_client.is_configured()
+        destinations_limited = destinations[:10]
+        destination_codes = [
+            airport.iata_code for airport in destinations_limited]
+        results, origins_with_ground, origins_without_ground = SmartNearbyAirportService._collect_results_for_origins(
+            origins, destinations_limited, resolved_origin, date_obj, use_real_api, destination_coords
+        )
+        sorted_results = SmartNearbyAirportService._sort_results(
+            results, sort_by, sort_order)[:max_results]
+        return SmartNearbyAirportService._search_return(
+            sorted_results,
+            return_meta,
+            origin_codes,
+            destination_codes,
+            origins_with_ground,
+            origins_without_ground,
+        )
+
+
 def _real_alternates_for_airport(origin_code, origin_airport, airport, distance, date_str,
                                  final_destination_address, dest_lat, dest_lon):
     """Get Amadeus offers for origin->airport and return list of result dicts.
@@ -160,7 +455,10 @@ def _real_alternates_for_airport(origin_code, origin_airport, airport, distance,
         )
         if journeys:
             transport = journeys[0]
-            ground_cost = float(transport.get('cost_eur', 0))
+            ground_cost = _safe_float(
+                transport.get('cost_eur'),
+                _safe_float(transport.get('estimated_cost_eur'), 0.0)
+            )
             transport_duration = int(transport.get('duration_minutes', 0))
     if transport is None:
         ground_transports = list(
@@ -245,7 +543,8 @@ class MultiModalConnectionService:
             score += float(airport.layover_quality_score or 0)
         except (TypeError, ValueError):
             pass
-        layover_minutes = int(layover_minutes) if layover_minutes is not None else 0
+        layover_minutes = int(
+            layover_minutes) if layover_minutes is not None else 0
         if 60 <= layover_minutes <= 180:
             score += 2.0
         elif layover_minutes < 45:
@@ -306,9 +605,10 @@ class MultiModalConnectionService:
 
     @staticmethod
     def _add_train_link_connection(connections, seen, flight1, train, flight2,
-                                    airport_a, airport_b, max_layover_mins):
+                                   airport_a, airport_b, max_layover_mins):
         """Append one train-link connection if valid and not duplicate."""
-        layover = (flight2.departure_time - flight1.arrival_time).total_seconds() / 60
+        layover = (flight2.departure_time -
+                   flight1.arrival_time).total_seconds() / 60
         if layover > max_layover_mins:
             return
         key = (flight1.id, train.id, flight2.id)
@@ -334,7 +634,8 @@ class MultiModalConnectionService:
     def _add_same_airport_connection(connections, seen, flight1, flight2,
                                      intermediate, max_layover_mins):
         """Append one same-airport connection if valid and not duplicate."""
-        layover = (flight2.departure_time - flight1.arrival_time).total_seconds() / 60
+        layover = (flight2.departure_time -
+                   flight1.arrival_time).total_seconds() / 60
         if layover > max_layover_mins:
             return
         key = (flight1.id, None, flight2.id)
@@ -389,7 +690,8 @@ class MultiModalConnectionService:
                     origin_airport=airport_b,
                     destination_airport=destination,
                     departure_time__date=date,
-                    departure_time__gte=flight1.arrival_time + timedelta(minutes=layover_min)
+                    departure_time__gte=flight1.arrival_time +
+                    timedelta(minutes=layover_min)
                 ).first()
                 if flight2:
                     MultiModalConnectionService._add_train_link_connection(
@@ -408,13 +710,15 @@ class MultiModalConnectionService:
             flight2 = Flight.objects.filter(
                 origin_airport=intermediate,
                 destination_airport=destination,
-                departure_time__gte=flight1.arrival_time + timedelta(minutes=min_connection_mins)
+                departure_time__gte=flight1.arrival_time +
+                timedelta(minutes=min_connection_mins)
             ).first()
             if flight2:
                 MultiModalConnectionService._add_same_airport_connection(
                     connections, seen, flight1, flight2, intermediate, max_layover_mins)
 
-        connections.sort(key=lambda x: (x['total_cost'], -x['connection_quality']))
+        connections.sort(key=lambda x: (
+            x['total_cost'], -x['connection_quality']))
         return connections
 
 
@@ -471,11 +775,13 @@ class AISearchService:
         Return (client, model_name) for Ollama only, or (None, None).
         AI Search uses local Ollama only; no OpenAI/Groq. If Ollama is not configured or not running, keyword fallback is used.
         """
-        backend = (getattr(settings, 'AI_SEARCH_LLM_BACKEND', None) or '').strip().lower()
+        backend = (getattr(settings, 'AI_SEARCH_LLM_BACKEND', None)
+                   or '').strip().lower()
         if backend != 'ollama':
             return None, None
 
-        base_url = (getattr(settings, 'OLLAMA_BASE_URL', None) or '').strip().rstrip('/')
+        base_url = (getattr(settings, 'OLLAMA_BASE_URL', None)
+                    or '').strip().rstrip('/')
         model = (getattr(settings, 'AI_SEARCH_OLLAMA_MODEL', None) or '').strip()
         if not base_url or not model:
             return None, None
@@ -484,7 +790,8 @@ class AISearchService:
             base_url = base_url + '/v1'
         base_url = base_url + '/'
         http_client = httpx.Client(timeout=60.0)
-        client = openai.OpenAI(api_key='ollama', base_url=base_url, http_client=http_client)
+        client = openai.OpenAI(
+            api_key='ollama', base_url=base_url, http_client=http_client)
         return client, model
 
     @staticmethod
@@ -492,7 +799,8 @@ class AISearchService:
         """Return list of city names that have at least one outgoing flight in the database (for LLM context)."""
         return list(
             Airport.objects.filter(
-                id__in=Flight.objects.values_list('origin_airport_id', flat=True).distinct()
+                id__in=Flight.objects.values_list(
+                    'origin_airport_id', flat=True).distinct()
             ).values_list('city', flat=True).distinct().order_by('city')
         )
 
@@ -501,7 +809,8 @@ class AISearchService:
         """Return list of city names that are destinations of at least one flight (for LLM context)."""
         return list(
             Airport.objects.filter(
-                id__in=Flight.objects.values_list('destination_airport_id', flat=True).distinct()
+                id__in=Flight.objects.values_list(
+                    'destination_airport_id', flat=True).distinct()
             ).values_list('city', flat=True).distinct().order_by('city')
         )
 
@@ -552,12 +861,14 @@ Return only a single JSON object with these keys. Use null for missing values. N
             result = AISearchService._extract_json_from_content(raw)
             if result and isinstance(result, dict):
                 return result, 0.9
-            logger.debug("AI search: could not parse JSON from LLM response: %s", raw[:200] if raw else "")
+            logger.debug(
+                "AI search: could not parse JSON from LLM response: %s", raw[:200] if raw else "")
             return AISearchService._simple_parse(query_text), 0.5
         except Exception as e:
             err_msg = str(e).lower()
             if 'refused' in err_msg or 'connection' in err_msg:
-                model_name = (getattr(settings, 'AI_SEARCH_OLLAMA_MODEL', None) or '').strip() or 'model from .env'
+                model_name = (getattr(settings, 'AI_SEARCH_OLLAMA_MODEL',
+                              None) or '').strip() or 'model from .env'
                 logger.warning(
                     "Ollama not running. Using keyword fallback. Start Ollama with your AI_SEARCH_OLLAMA_MODEL (%s).",
                     model_name,
@@ -570,14 +881,16 @@ Return only a single JSON object with these keys. Use null for missing values. N
     def _parse_origin_keywords(query_text, query_lower):
         """Extract origin_city from 'from X' or first word. Case-insensitive."""
         import re
-        from_match = re.search(r'(?:from|flying from)\s+([a-z]+)', query_text, re.IGNORECASE)
+        from_match = re.search(
+            r'(?:from|flying from)\s+([a-z]+)', query_text, re.IGNORECASE)
         if from_match:
             return from_match.group(1).strip()
         first_word = re.match(r'^\s*([a-z]+)', query_text, re.IGNORECASE)
         if not first_word:
             return None
         w = first_word.group(1).strip()
-        stop = ('i', 'a', 'the', 'want', 'need', 'looking', 'for', 'to', 'my', 'me', 'hi', 'hello')
+        stop = ('i', 'a', 'the', 'want', 'need', 'looking',
+                'for', 'to', 'my', 'me', 'hi', 'hello')
         return w if w.lower() not in stop and len(w) > 1 else None
 
     @staticmethod
@@ -609,8 +922,10 @@ Return only a single JSON object with these keys. Use null for missing values. N
             return empty
         query_lower = str(query_text).lower().strip()
         result = dict(empty)
-        result['origin_city'] = AISearchService._parse_origin_keywords(query_text, query_lower)
-        price_match = re.search(r'€?\s*(\d+)\s*(?:eur|euro|€|euros)?', query_lower)
+        result['origin_city'] = AISearchService._parse_origin_keywords(
+            query_text, query_lower)
+        price_match = re.search(
+            r'€?\s*(\d+)\s*(?:eur|euro|€|euros)?', query_lower)
         if price_match:
             try:
                 result['max_price_eur'] = float(price_match.group(1))
@@ -622,7 +937,8 @@ Return only a single JSON object with these keys. Use null for missing values. N
                 result['max_duration_hours'] = int(duration_match.group(1))
             except (TypeError, ValueError):
                 pass
-        dest_type, weather = AISearchService._parse_destination_weather_keywords(query_lower)
+        dest_type, weather = AISearchService._parse_destination_weather_keywords(
+            query_lower)
         if dest_type:
             result['destination_type'] = dest_type
         if weather:
@@ -648,7 +964,8 @@ Return only a single JSON object with these keys. Use null for missing values. N
     @staticmethod
     def _dest_airports_for_amadeus(parsed_query, origin_airport):
         """Return list of destination airports for Amadeus: from DB (query match or flights from origin), else any airports in DB."""
-        matching = AISearchService._find_matching_airports(parsed_query, origin_airport)
+        matching = AISearchService._find_matching_airports(
+            parsed_query, origin_airport)
         dest = [a for a in matching[:10] if a.id != origin_airport.id]
         if dest:
             return dest
@@ -659,7 +976,8 @@ Return only a single JSON object with these keys. Use null for missing values. N
         """Run AI search using Amadeus Flight Offers API. Returns list of match dicts."""
         from api.amadeus_client import search_flight_offers_for_ai_search
         date_str, _ = AISearchService._departure_date_from_parsed(parsed_query)
-        dest_airports = AISearchService._dest_airports_for_amadeus(parsed_query, origin_airport)
+        dest_airports = AISearchService._dest_airports_for_amadeus(
+            parsed_query, origin_airport)
         origin_dict = {
             'iata_code': origin_airport.iata_code,
             'name': origin_airport.name,
@@ -683,7 +1001,8 @@ Return only a single JSON object with these keys. Use null for missing values. N
                 AISearchService._amadeus_offers_to_matches(
                     offers, parsed_query, max_price, max_minutes)
             )
-        all_offers.sort(key=lambda x: (x['match_score'], -x['total_trip_cost_eur']), reverse=True)
+        all_offers.sort(key=lambda x: (
+            x['match_score'], -x['total_trip_cost_eur']), reverse=True)
         return all_offers[:3]
 
     @staticmethod
@@ -720,7 +1039,8 @@ Return only a single JSON object with these keys. Use null for missing values. N
         """Run AI search using flights in the database. Returns (search, options list of TripOption)."""
         matching_airports = AISearchService._find_matching_airports(
             parsed_query, origin_airport)
-        dest_airports = [a for a in matching_airports[:10] if a.id != origin_airport.id]
+        dest_airports = [a for a in matching_airports[:10]
+                         if a.id != origin_airport.id]
         options = []
         for dest_airport in dest_airports:
             flights = Flight.objects.filter(
@@ -730,7 +1050,8 @@ Return only a single JSON object with these keys. Use null for missing values. N
                 duration_minutes__lte=max_minutes
             )[:3]
             for flight in flights:
-                match_score = AISearchService._calculate_match_score(flight, parsed_query)
+                match_score = AISearchService._calculate_match_score(
+                    flight, parsed_query)
                 option = TripOption.objects.create(
                     search=search,
                     flight=flight,
@@ -763,12 +1084,13 @@ Return only a single JSON object with these keys. Use null for missing values. N
         if not origin_airport:
             return search, []
 
-        max_price, max_minutes = AISearchService._parse_budget_and_duration(parsed_query)
+        max_price, max_minutes = AISearchService._parse_budget_and_duration(
+            parsed_query)
 
         try:
             from api.amadeus_client import is_configured as amadeus_configured
         except ImportError:
-            amadeus_configured = lambda: False
+            def amadeus_configured(): return False
         if amadeus_configured():
             try:
                 top = AISearchService._search_by_query_amadeus(
@@ -791,7 +1113,8 @@ Return only a single JSON object with these keys. Use null for missing values. N
         candidates = list(Airport.objects.filter(name__icontains=origin))
         if candidates:
             return candidates
-        aliases = {'milan': ['milano'], 'rome': ['roma'], 'munich': ['muenchen', 'münchen']}
+        aliases = {'milan': ['milano'], 'rome': [
+            'roma'], 'munich': ['muenchen', 'münchen']}
         lower = origin.lower()
         for _city, alternates in aliases.items():
             if lower != _city and lower not in alternates:
@@ -812,8 +1135,10 @@ Return only a single JSON object with these keys. Use null for missing values. N
         import re
         origin = str(origin_city).strip()
         # Strip "from X" prefix so we match city name
-        origin = re.sub(r'^(?:from|flying from)\s+', '', origin, flags=re.IGNORECASE).strip() or origin
-        origin = re.sub(r'[.,;!?]+$', '', origin).strip() or origin  # trailing punctuation
+        origin = re.sub(r'^(?:from|flying from)\s+', '', origin,
+                        flags=re.IGNORECASE).strip() or origin
+        # trailing punctuation
+        origin = re.sub(r'[.,;!?]+$', '', origin).strip() or origin
         if not origin:
             return None
         candidates = AISearchService._origin_airport_candidates(origin)
@@ -875,8 +1200,10 @@ Return only a single JSON object with these keys. Use null for missing values. N
         except (TypeError, ValueError):
             max_hours = 0
 
-        price_eur = float(flight.get('price_eur', 0) if isinstance(flight, dict) else getattr(flight, 'price_eur', 0))
-        duration_minutes = int(flight.get('duration_minutes', 0) if isinstance(flight, dict) else getattr(flight, 'duration_minutes', 0))
+        price_eur = float(flight.get('price_eur', 0) if isinstance(
+            flight, dict) else getattr(flight, 'price_eur', 0))
+        duration_minutes = int(flight.get('duration_minutes', 0) if isinstance(
+            flight, dict) else getattr(flight, 'duration_minutes', 0))
 
         if max_price > 0:
             if price_eur > max_price:

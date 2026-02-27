@@ -63,15 +63,15 @@
                 <p class="text-gray-600 mb-6">Find cheaper flights to nearby airports and calculate total trip cost</p>
                 
                 <form id="nearestAlternateForm" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label for="origin_airport_code" class="block text-sm font-medium text-gray-700 mb-2">Origin Airport Code</label>
-                            <input type="text" id="origin_airport_code" name="origin_airport_code" placeholder="e.g., MIL" required
+                            <label for="origin_query" class="block text-sm font-medium text-gray-700 mb-2">Your Origin (city/address/airport)</label>
+                            <input type="text" id="origin_query" name="origin_query" placeholder="e.g., Luxembourg or LUX" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label for="final_destination_address" class="block text-sm font-medium text-gray-700 mb-2">Final Destination Address</label>
-                            <input type="text" id="final_destination_address" name="final_destination_address" placeholder="e.g., 123 Main St, London" required
+                            <label for="destination_query" class="block text-sm font-medium text-gray-700 mb-2">Destination (country/city/airport)</label>
+                            <input type="text" id="destination_query" name="destination_query" placeholder="e.g., Croatia or ZAG" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
@@ -80,8 +80,28 @@
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label for="radius_km" class="block text-sm font-medium text-gray-700 mb-2">Radius (km)</label>
-                            <input type="number" id="radius_km" name="radius_km" value="100" min="10" max="500"
+                            <label for="origin_radius_km" class="block text-sm font-medium text-gray-700 mb-2">Origin Radius (km)</label>
+                            <input type="number" id="origin_radius_km" name="origin_radius_km" value="220" min="10" max="800"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="sort_by" class="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                            <select id="sort_by" name="sort_by" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="cost">Total Cost</option>
+                                <option value="duration">Total Duration</option>
+                                <option value="origin_distance_km">Distance from Origin</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="sort_order" class="block text-sm font-medium text-gray-700 mb-2">Sort Order</label>
+                            <select id="sort_order" name="sort_order" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="asc">Ascending</option>
+                                <option value="desc">Descending</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="max_results" class="block text-sm font-medium text-gray-700 mb-2">Max Results</label>
+                            <input type="number" id="max_results" name="max_results" value="20" min="1" max="100"
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                     </div>
@@ -220,6 +240,12 @@
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
+            if (!data.origin_airport_code) {
+                data.origin_airport_code = data.origin_query || '';
+            }
+            if (!data.final_destination_address) {
+                data.final_destination_address = data.destination_query || '';
+            }
             const container = document.getElementById('nearestAlternateResults');
             container.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Searching flights...</p>';
             try {
@@ -267,24 +293,44 @@
             const flight = result.flight || {};
             const origin = (flight.origin_airport && flight.origin_airport.iata_code) || '—';
             const dest = (flight.destination_airport && flight.destination_airport.iata_code) || '—';
+            const originAirport = result.origin_airport || flight.origin_airport || {};
+            const destinationAirport = result.destination_airport || result.airport || flight.destination_airport || {};
+            const originLabel = originAirport.name ? `${originAirport.name} (${originAirport.iata_code || origin})` : origin;
+            const destinationLabel = destinationAirport.name ? `${destinationAirport.name} (${destinationAirport.iata_code || dest})` : dest;
+            const groundLeg = result.ground_leg || result.ground_transport || {};
+            const groundMode = groundLeg.mode || groundLeg.transport_type || 'ground';
+            const groundSummary = groundLeg.name || 'Ground transfer';
             const bookingLinkHtml = buildBookingLinkHtml(flight, origin, dest);
             const totalCost = result.total_trip_cost_converted || (result.total_trip_cost_eur * exchangeRate);
             const flightCost = (result.flight_cost_eur || 0) * exchangeRate;
             const groundCost = (result.ground_cost_eur == null ? 0 : result.ground_cost_eur) * exchangeRate;
             const timeH = Math.floor(result.total_trip_time_minutes / 60);
             const timeM = result.total_trip_time_minutes % 60;
+            const originDistance = Number(result.origin_distance_km || 0).toFixed(1);
+            const destinationDistance = Number(result.distance_to_destination_km || 0).toFixed(1);
+            const groundMinutes = Number(result.ground_duration_minutes || (groundLeg.duration_minutes || 0));
+            const flightMinutes = Number(result.flight_duration_minutes || (flight.duration_minutes || 0));
+            const groundHours = Math.floor(groundMinutes / 60);
+            const groundMinsOnly = groundMinutes % 60;
+            const flightHours = Math.floor(flightMinutes / 60);
+            const flightMinsOnly = flightMinutes % 60;
             return `
                 <div class="bg-white rounded-lg shadow-md p-6 card-hover">
                     <div class="flex justify-between items-start mb-4">
                         <div>
                             <h3 class="text-xl font-bold">Option ${idx + 1}</h3>
-                            <p class="text-gray-600">${result.airport.name} (${result.airport.iata_code})</p>
-                            <p class="text-sm text-gray-500">${result.distance_to_destination_km.toFixed(1)} km from destination</p>
+                            <p class="text-gray-700">${originLabel} <i class="fas fa-arrow-right mx-1 text-xs"></i> ${destinationLabel}</p>
+                            <p class="text-sm text-gray-500">${originDistance} km from your location · ${destinationDistance} km from destination center</p>
                         </div>
                         <div class="text-right">
                             <p class="text-2xl font-bold text-green-600">${currencySymbol}${totalCost.toFixed(2)}</p>
                             <p class="text-sm text-gray-600">Total Cost</p>
                         </div>
+                    </div>
+                    <div class="mb-4 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                        <span class="font-semibold">Ground:</span> ${groundSummary} (${groundMode}) · ${groundHours}h ${groundMinsOnly}m
+                        <span class="mx-2">|</span>
+                        <span class="font-semibold">Flight:</span> ${origin} → ${dest} · ${flightHours}h ${flightMinsOnly}m
                     </div>
                     <div class="grid grid-cols-2 gap-4 mt-4">
                         <div>
@@ -311,6 +357,119 @@
             `;
         }
 
+        function buildSearchMetaHtml(searchMeta) {
+            const meta = searchMeta || {};
+            const origins = meta.origin_airports_considered || [];
+            const destinations = meta.destination_airports_considered || [];
+            if (!origins.length && !destinations.length) {
+                return '';
+            }
+            const originText = origins.length ? origins.join(', ') : 'none';
+            const destinationText = destinations.length ? destinations.join(', ') : 'none';
+            return (
+                '<div class="mb-3 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">' +
+                '<p><span class="font-semibold">Checked origins:</span> ' + originText + '</p>' +
+                '<p><span class="font-semibold">Checked destinations:</span> ' + destinationText + '</p>' +
+                '</div>'
+            );
+        }
+
+        function sortNearestResults(results, mode) {
+            const list = (results || []).slice();
+            const getCost = (r) => Number(r.total_trip_cost_eur || 0);
+            const getTime = (r) => Number(r.total_trip_time_minutes || 0);
+            const getDistance = (r) => Number(r.origin_distance_km || 0);
+            const getId = (r) => String(r.flight_id || '');
+            const cmp = (a, b) => {
+                if (a < b) {
+                    return -1;
+                }
+                if (a > b) {
+                    return 1;
+                }
+                return 0;
+            };
+            const compareBy = (a, b, getters) => {
+                for (const getter of getters) {
+                    const diff = cmp(getter(a), getter(b));
+                    if (diff !== 0) {
+                        return diff;
+                    }
+                }
+                return 0;
+            };
+
+            if (mode === 'cheapest') {
+                return list.sort((a, b) => compareBy(a, b, [getCost, getTime, getDistance, getId]));
+            }
+            if (mode === 'quickest') {
+                return list.sort((a, b) => compareBy(a, b, [getTime, getCost, getDistance, getId]));
+            }
+            if (mode === 'nearest') {
+                return list.sort((a, b) => compareBy(a, b, [getDistance, getCost, getTime, getId]));
+            }
+
+            // "Best" similar to travel metasearch: blended score of cost/time/distance.
+            const maxCost = Math.max(...list.map(getCost), 1);
+            const maxTime = Math.max(...list.map(getTime), 1);
+            const maxDistance = Math.max(...list.map(getDistance), 1);
+            return list.sort((a, b) => {
+                const scoreA = (getCost(a) / maxCost) * 0.45 + (getTime(a) / maxTime) * 0.4 + (getDistance(a) / maxDistance) * 0.15;
+                const scoreB = (getCost(b) / maxCost) * 0.45 + (getTime(b) / maxTime) * 0.4 + (getDistance(b) / maxDistance) * 0.15;
+                const scoreCmp = cmp(scoreA, scoreB);
+                if (scoreCmp !== 0) {
+                    return scoreCmp;
+                }
+                return compareBy(a, b, [getCost, getTime, getDistance, getId]);
+            });
+        }
+
+        function buildPostSearchSortBar(selectedMode = 'best') {
+            const mode = selectedMode;
+            return (
+                '<div class="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-white p-3">' +
+                '<span class="text-sm font-semibold text-gray-700 mr-2">Sort results:</span>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'best\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'best' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">Best</button>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'cheapest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'cheapest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">Cheapest</button>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'quickest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'quickest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">Quickest</button>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'nearest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'nearest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">Nearest Airport</button>' +
+                '</div>'
+            );
+        }
+
+        function renderNearestAlternateCards(data, mode) {
+            const container = document.getElementById('nearestAlternateResults');
+            const currency = data.currency || 'EUR';
+            const currencySymbol = getCurrencySymbol(currency);
+            const first = data.results && data.results[0];
+            const needRate = data.currency === 'EUR' ? false : (first && first.total_trip_cost_converted);
+            const exchangeRate = needRate ? first.total_trip_cost_converted / first.total_trip_cost_eur : 1;
+            const searchMetaHtml = buildSearchMetaHtml(data.search_meta);
+            const sorted = sortNearestResults(data.results || [], mode);
+            globalThis.lastNearestAlternateResults = sorted;
+            globalThis.lastNearestAlternateResponse = data;
+            globalThis.lastNearestSortMode = mode || 'best';
+
+            if (!sorted.length) {
+                container.innerHTML = searchMetaHtml + '<p class="text-gray-600">No results found.' + (data.hint ? ' ' + data.hint : '') + '</p>';
+                return;
+            }
+
+            const serverSortLabel = (data.sort_by || 'cost') + ' / ' + (data.sort_order || 'asc');
+            container.innerHTML =
+                searchMetaHtml +
+                buildPostSearchSortBar(mode || 'best') +
+                '<div class="mb-3 text-sm text-gray-600">API sort: <span class="font-semibold">' + serverSortLabel + '</span></div>' +
+                sorted.map((result, idx) => buildNearestAlternateCard(result, idx, currencySymbol, exchangeRate)).join('');
+        }
+
+        function applyNearestResultsSort(mode) {
+            if (!globalThis.lastNearestAlternateResponse) {
+                return;
+            }
+            renderNearestAlternateCards(globalThis.lastNearestAlternateResponse, mode || 'best');
+        }
+
         function displayNearestAlternateResults(data) {
             const container = document.getElementById('nearestAlternateResults');
             container.innerHTML = '';
@@ -318,19 +477,7 @@
                 container.innerHTML = '<p class="text-red-600">' + data.error + (data.hint ? ' ' + data.hint : '') + '</p>';
                 return;
             }
-            const currency = data.currency || 'EUR';
-            const currencySymbol = getCurrencySymbol(currency);
-            const first = data.results && data.results[0];
-            const needRate = data.currency === 'EUR' ? false : (first && first.total_trip_cost_converted);
-            const exchangeRate = needRate ? first.total_trip_cost_converted / first.total_trip_cost_eur : 1;
-            if (data.results && data.results.length > 0) {
-                globalThis.lastNearestAlternateResults = data.results;
-                container.innerHTML = data.results.map((result, idx) =>
-                    buildNearestAlternateCard(result, idx, currencySymbol, exchangeRate)
-                ).join('');
-            } else {
-                container.innerHTML = '<p class="text-gray-600">No results found.' + (data.hint ? ' ' + data.hint : '') + '</p>';
-            }
+            renderNearestAlternateCards(data, 'best');
         }
         
         /** Save from nearest-alternate by result index (sends full offer for API results). */

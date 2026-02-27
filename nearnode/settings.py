@@ -173,6 +173,19 @@ OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
 # You'll need to integrate with a flight API
 FLIGHT_API_KEY = config('FLIGHT_API_KEY', default='')
 WEATHER_API_KEY = config('WEATHER_API_KEY', default='')  # For weather data
+GROUND_PROVIDER = config('GROUND_PROVIDER', default='navitia')
+GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
+NAVITIA_TOKEN = config('NAVITIA_TOKEN', default='')
+NAVITIA_REGION = config('NAVITIA_REGION', default='fr-idf')
+NAVITIA_BASE_URL = config('NAVITIA_BASE_URL', default='https://api.navitia.io/v1')
+GOOGLE_ROUTES_URL = config(
+    'GOOGLE_ROUTES_URL',
+    default='https://routes.googleapis.com/directions/v2:computeRoutes'
+)
+AMADEUS_BASE_URL = config('AMADEUS_BASE_URL', default='https://test.api.amadeus.com')
+AMADEUS_TOKEN_PATH = config('AMADEUS_TOKEN_PATH', default='/v1/security/oauth2/token')
+AMADEUS_FLIGHT_OFFERS_PATH = config('AMADEUS_FLIGHT_OFFERS_PATH', default='/v2/shopping/flight-offers')
+OPENWEATHER_BASE_URL = config('OPENWEATHER_BASE_URL', default='https://api.openweathermap.org/data/2.5')
 
 # AI Search LLM. Set in .env: AI_SEARCH_LLM_BACKEND=ollama, OLLAMA_BASE_URL, AI_SEARCH_OLLAMA_MODEL.
 AI_SEARCH_LLM_BACKEND = config('AI_SEARCH_LLM_BACKEND', default='').strip().lower() or None

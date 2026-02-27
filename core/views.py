@@ -185,11 +185,14 @@ def _fetch_weather_for_city(city_name):
     if not city_name or not str(city_name).strip():
         return None
     api_key = (getattr(settings, 'WEATHER_API_KEY', None) or '').strip()
+    base_url = (getattr(settings, 'OPENWEATHER_BASE_URL', None) or '').strip().rstrip('/')
     if not api_key:
+        return None
+    if not base_url:
         return None
     try:
         resp = requests.get(
-            'https://api.openweathermap.org/data/2.5/weather',
+            base_url + '/weather',
             params={'q': str(city_name).strip(), 'appid': api_key, 'units': 'metric'},
             timeout=5,
         )

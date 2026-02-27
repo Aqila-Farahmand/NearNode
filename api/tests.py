@@ -7,6 +7,11 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 from datetime import timedelta
+from decimal import Decimal
+from unittest.mock import patch
+
+from core.models import Airport, Flight
+from api import amadeus_client
 
 User = get_user_model()
 
@@ -47,7 +52,7 @@ class NearestAlternateAPITest(TestCase):
         self.assertIn('error', r.json())
 
     def test_nearest_alternate_valid_request_returns_200(self):
-        """Valid POST returns 200 and results/hint."""
+        """Valid POST returns 200 when real API config exists, else 400."""
         date = (timezone.now() + timedelta(days=7)).strftime('%Y-%m-%d')
         r = self.client.post(
             self.url,
@@ -59,11 +64,16 @@ class NearestAlternateAPITest(TestCase):
             },
             format='json',
         )
-        self.assertEqual(r.status_code, 200)
         data = r.json()
-        self.assertIn('results', data)
-        self.assertIn('count', data)
-        self.assertIn('currency', data)
+        if amadeus_client.is_configured():
+            self.assertEqual(r.status_code, 200)
+            self.assertIn('results', data)
+            self.assertIn('count', data)
+            self.assertIn('currency', data)
+        else:
+            self.assertEqual(r.status_code, 400)
+            self.assertIn('error', data)
+            self.assertIn('AMADEUS', data.get('error', '').upper())
 
 
 class NearestAirportAPITest(TestCase):
@@ -89,3 +99,151 @@ class NearestAirportAPITest(TestCase):
             data = r.json()
             self.assertIn('airport', data)
             self.assertIn('iata_code', data)
+
+
+class SmartNearestAlternateSearchTest(TestCase):
+    """Covers nearby-origin expansion and deterministic sorting."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='smartuser', email='smart@example.com', password=TEST_AUTH_SECRET
+        )
+        self.client.force_authenticate(user=self.user)
+        self.url = '/api/nearest-alternate/'
+        self.search_date = (timezone.now() + timedelta(days=7)).date()
+
+        self.airports = {
+            'LUX': self._airport('ELLX', 'LUX', 'Luxembourg Findel', 'Luxembourg', 'Luxembourg', '49.6233', '6.2044'),
+            'FRA': self._airport('EDDF', 'FRA', 'Frankfurt Airport', 'Frankfurt', 'Germany', '50.0379', '8.5622'),
+            'BVA': self._airport('LFOB', 'BVA', 'Beauvais', 'Paris', 'France', '49.4544', '2.1128'),
+            'ZAG': self._airport('LDZA', 'ZAG', 'Zagreb Airport', 'Zagreb', 'Croatia', '45.7429', '16.0688'),
+        }
+
+        # Origin alternatives within radius (Luxembourg + Germany/France) to Croatia.
+        self._flight('LG100', 'Luxair', 'LUX', 'ZAG', 150, 150.00, 8)
+        self._flight('LH200', 'Lufthansa', 'FRA', 'ZAG', 100, 90.00, 10)
+        self._flight('FR300', 'Ryanair', 'BVA', 'ZAG', 120, 60.00, 12)
+
+        self.amadeus_config_patch = patch('api.views.amadeus_client.is_configured', return_value=True)
+        self.amadeus_search_patch = patch(
+            'api.amadeus_client.search_flight_offers',
+            side_effect=self._mock_search_flight_offers
+        )
+        self.ground_patch = patch(
+            'api.ground_transport_client.get_ground_options',
+            side_effect=self._mock_ground_options
+        )
+        self.amadeus_config_patch.start()
+        self.amadeus_search_patch.start()
+        self.ground_patch.start()
+        self.addCleanup(self.amadeus_config_patch.stop)
+        self.addCleanup(self.amadeus_search_patch.stop)
+        self.addCleanup(self.ground_patch.stop)
+
+    def _airport(self, icao, iata, name, city, country, lat, lon):
+        return Airport.objects.create(
+            icao_code=icao,
+            iata_code=iata,
+            name=name,
+            city=city,
+            country=country,
+            latitude=Decimal(lat),
+            longitude=Decimal(lon),
+        )
+
+    def _flight(self, number, airline, origin_iata, dest_iata, duration_min, price_eur, dep_hour):
+        departure = timezone.make_aware(
+            timezone.datetime.combine(self.search_date, timezone.datetime.min.time())
+        ) + timedelta(hours=dep_hour)
+        arrival = departure + timedelta(minutes=duration_min)
+        return Flight.objects.create(
+            flight_number=number,
+            airline=airline,
+            origin_airport=self.airports[origin_iata],
+            destination_airport=self.airports[dest_iata],
+            departure_time=departure,
+            arrival_time=arrival,
+            price_eur=Decimal(str(price_eur)),
+            duration_minutes=duration_min,
+            available_seats=20,
+        )
+
+    def _search(self, **overrides):
+        payload = {
+            'origin_query': 'Luxembourg',
+            'destination_query': 'Croatia',
+            'date': self.search_date.strftime('%Y-%m-%d'),
+            'origin_radius_km': 320,
+            'sort_by': 'cost',
+            'sort_order': 'asc',
+            'max_results': 10,
+        }
+        payload.update(overrides)
+        return self.client.post(self.url, payload, format='json')
+
+    def _mock_search_flight_offers(self, origin_iata, destination_iata, departure_date, adults=1):
+        if destination_iata != 'ZAG':
+            return []
+        offers = {
+            'LUX': {'price_eur': 150.0, 'duration_minutes': 150, 'airline': 'Luxair', 'number': 'LG100'},
+            'FRA': {'price_eur': 90.0, 'duration_minutes': 100, 'airline': 'Lufthansa', 'number': 'LH200'},
+            'BVA': {'price_eur': 60.0, 'duration_minutes': 120, 'airline': 'Ryanair', 'number': 'FR300'},
+        }
+        one = offers.get(origin_iata)
+        if not one:
+            return []
+        return [{
+            'id': '{}-{}-offer'.format(origin_iata, destination_iata),
+            'price_eur': one['price_eur'],
+            'duration_minutes': one['duration_minutes'],
+            'airline': one['airline'],
+            'number': one['number'],
+        }]
+
+    def _mock_ground_options(self, from_lat, from_lon, to_lat, to_lon):
+        return [{
+            'duration_minutes': 30,
+            'cost_eur': 12.0,
+            'estimated_cost_eur': 12.0,
+            'distance_km': 25.0,
+            'mode': 'transit',
+            'name': 'Mock train',
+            'transport_type': 'train',
+            'provider': 'google_routes',
+        }]
+
+    def test_cross_border_origin_expansion_returns_multiple_origins(self):
+        r = self._search()
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertGreaterEqual(data.get('count', 0), 2)
+        origins = {item.get('origin_airport', {}).get('iata_code') for item in data.get('results', [])}
+        self.assertIn('LUX', origins)
+        self.assertIn('FRA', origins)
+
+    def test_sort_by_duration(self):
+        r = self._search(sort_by='duration')
+        self.assertEqual(r.status_code, 200)
+        results = r.json().get('results', [])
+        self.assertGreaterEqual(len(results), 2)
+        durations = [row['total_trip_time_minutes'] for row in results]
+        self.assertEqual(durations, sorted(durations))
+
+    def test_sort_by_origin_distance(self):
+        r = self._search(sort_by='origin_distance_km')
+        self.assertEqual(r.status_code, 200)
+        results = r.json().get('results', [])
+        self.assertGreaterEqual(len(results), 2)
+        distances = [row['origin_distance_km'] for row in results]
+        self.assertEqual(distances, sorted(distances))
+
+    def test_response_includes_ground_and_flight_breakdown(self):
+        r = self._search()
+        self.assertEqual(r.status_code, 200)
+        first = r.json().get('results', [])[0]
+        self.assertIn('ground_leg', first)
+        self.assertIn('flight_leg', first)
+        self.assertIn('flight_cost_eur', first)
+        self.assertIn('ground_cost_eur', first)
+        self.assertIn('origin_distance_km', first)

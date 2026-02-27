@@ -23,7 +23,7 @@ from .serializers import (
 from .services import (
     NearestAlternateService, MultiModalConnectionService,
     AISearchService, CollaborativeService, DelayPredictionService,
-    find_best_alternates_real,
+    SmartNearbyAirportService,
 )
 from . import amadeus_client
 
@@ -80,11 +80,14 @@ def _fetch_weather_for_city(city_name):
     if not city_name or not str(city_name).strip():
         return None
     api_key = (getattr(settings, 'WEATHER_API_KEY', None) or '').strip()
+    base_url = (getattr(settings, 'OPENWEATHER_BASE_URL', None) or '').strip().rstrip('/')
     if not api_key:
+        return None
+    if not base_url:
         return None
     try:
         resp = requests.get(
-            'https://api.openweathermap.org/data/2.5/weather',
+            base_url + '/weather',
             params={'q': str(city_name).strip(),
                     'appid': api_key, 'units': 'metric'},
             timeout=5,
@@ -200,12 +203,19 @@ def nearest_alternate_search(request):
     """
     origin_airport_code = request.data.get('origin_airport_code')
     final_destination_address = request.data.get('final_destination_address')
+    origin_query = request.data.get('origin_query') or origin_airport_code
+    destination_query = request.data.get('destination_query') or final_destination_address
     date_str = request.data.get('date')
     radius_km = float(request.data.get('radius_km', 100))
+    origin_radius_km = float(request.data.get('origin_radius_km', radius_km))
+    destination_radius_km = float(request.data.get('destination_radius_km', radius_km))
+    sort_by = (request.data.get('sort_by') or 'cost').strip().lower()
+    sort_order = (request.data.get('sort_order') or 'asc').strip().lower()
+    max_results = int(request.data.get('max_results', 30))
 
-    if not all([origin_airport_code, final_destination_address, date_str]):
+    if not all([origin_query, destination_query, date_str]):
         return Response(
-            {'error': 'origin_airport_code, final_destination_address, and date required'},
+            {'error': 'origin_query/destination_query/date are required (legacy: origin_airport_code/final_destination_address/date).'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -214,21 +224,25 @@ def nearest_alternate_search(request):
     except ValueError:
         return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if amadeus_client.is_configured():
-        results = find_best_alternates_real(
-            origin_airport_code,
-            final_destination_address,
-            date,
-            radius_km,
-        )
-    else:
-        results = NearestAlternateService.find_best_alternates(
-            origin_airport_code,
-            final_destination_address,
-            date,
-            radius_km,
+    if not amadeus_client.is_configured():
+        return Response(
+            {'error': 'Real flight search requires AMADEUS_API_KEY and AMADEUS_API_SECRET.'},
+            status=status.HTTP_400_BAD_REQUEST
         )
 
+    smart_search = SmartNearbyAirportService.search(
+        origin_query=origin_query,
+        destination_query=destination_query,
+        search_date=date,
+        origin_radius_km=origin_radius_km,
+        destination_radius_km=destination_radius_km,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        max_results=max_results,
+        return_meta=True,
+    )
+    results = smart_search.get('results', [])
+    search_meta = smart_search.get('meta', {})
     # Get user's currency preference if authenticated
     currency = 'EUR'
     if request.user.is_authenticated:
@@ -254,44 +268,104 @@ def nearest_alternate_search(request):
     payload = {
         'results': serialized_results,
         'count': len(serialized_results),
-        'currency': currency
+        'currency': currency,
+        'sort_by': sort_by,
+        'sort_order': sort_order,
+        'search_meta': search_meta,
     }
     if len(serialized_results) == 0:
-        payload['hint'] = _nearest_alternate_empty_hint(
-            origin_airport_code, final_destination_address, date
+        payload['hint'] = _smart_search_empty_hint(
+            origin_query, destination_query, origin_radius_km, search_meta
         )
     return Response(payload)
 
 
 def _serialize_one_alternate(result, rate, currency, use_real_api):
     """Build one serialized result for nearest-alternate (DB or real API)."""
-    if use_real_api and isinstance(result.get('flight'), dict):
-        flight_data = result['flight']
-        flight_id = result.get('flight_id')
-        ground = result.get('ground_transport')
-    else:
-        flight_data = FlightSerializer(result['flight']).data
-        flight_id = flight_data.get('id')
-        ground = result.get('ground_transport')
-    if isinstance(ground, dict):
-        ground_data = ground
-    elif ground:
-        ground_data = GroundTransportSerializer(ground).data
-    else:
-        ground_data = None
+    flight_data, flight_id = _serialize_alternate_flight(result, use_real_api)
+    ground_data = _serialize_alternate_ground(result.get('ground_transport'))
+    origin_airport_data = _serialize_origin_airport_data(result, flight_data)
+    destination_airport_data = _serialize_destination_airport_data(result, flight_data)
+    total_cost = _as_float(result.get('total_cost_eur', 0))
+    ground_cost = _as_float(result.get('ground_cost', 0))
+    flight_duration = _alternate_duration_minutes(
+        result, 'flight_time_minutes', flight_data, 'duration_minutes'
+    )
+    ground_duration = _alternate_duration_minutes(
+        result, 'ground_time_minutes', ground_data, 'duration_minutes'
+    )
     return {
         'flight': flight_data,
+        'flight_leg': flight_data,
         'flight_id': flight_id,
         'ground_transport': ground_data,
+        'ground_leg': ground_data,
         'airport': AirportSerializer(result['airport']).data,
-        'distance_to_destination_km': result['distance_to_destination_km'],
-        'total_trip_cost_eur': float(result['total_cost_eur']),
-        'total_trip_cost_converted': float(result['total_cost_eur']) * rate,
+        'origin_airport': origin_airport_data,
+        'destination_airport': destination_airport_data,
+        'origin_distance_km': float(result.get('origin_distance_km', 0) or 0),
+        'distance_to_destination_km': float(result.get('distance_to_destination_km', 0) or 0),
+        'total_trip_cost_eur': total_cost,
+        'total_trip_cost_converted': total_cost * rate,
         'currency': currency,
         'total_trip_time_minutes': result['total_time_minutes'],
         'flight_cost_eur': float(result['flight_cost']),
-        'ground_cost_eur': float(result.get('ground_cost', 0)),
+        'ground_cost_eur': ground_cost,
+        'flight_duration_minutes': flight_duration,
+        'ground_duration_minutes': ground_duration,
     }
+
+
+def _serialize_alternate_flight(result, use_real_api):
+    if use_real_api and isinstance(result.get('flight'), dict):
+        return result['flight'], result.get('flight_id')
+    flight_data = FlightSerializer(result['flight']).data
+    return flight_data, flight_data.get('id')
+
+
+def _serialize_alternate_ground(ground):
+    if isinstance(ground, dict):
+        return ground
+    if ground:
+        return GroundTransportSerializer(ground).data
+    return None
+
+
+def _serialize_origin_airport_data(result, flight_data):
+    origin_airport_obj = result.get('origin_airport')
+    if origin_airport_obj:
+        return AirportSerializer(origin_airport_obj).data
+    return _flight_field_if_dict(flight_data, 'origin_airport')
+
+
+def _serialize_destination_airport_data(result, flight_data):
+    destination_airport_obj = result.get('destination_airport') or result.get('airport')
+    if destination_airport_obj:
+        return AirportSerializer(destination_airport_obj).data
+    return _flight_field_if_dict(flight_data, 'destination_airport')
+
+
+def _flight_field_if_dict(flight_data, key):
+    if isinstance(flight_data, dict):
+        return flight_data.get(key)
+    return None
+
+
+def _as_float(value, default=0.0):
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _alternate_duration_minutes(result, result_key, leg_data, leg_duration_key):
+    if result.get(result_key) is not None:
+        return int(result.get(result_key) or 0)
+    if isinstance(leg_data, dict):
+        return int(leg_data.get(leg_duration_key, 0) or 0)
+    return 0
 
 
 def _nearest_alternate_empty_hint(origin_airport_code, final_destination_address, date):
@@ -300,7 +374,8 @@ def _nearest_alternate_empty_hint(origin_airport_code, final_destination_address
     dest_lat, dest_lon = NearestAlternateService._resolve_destination_coords(
         final_destination_address
     )
-    if not Airport.objects.filter(iata_code=origin_code).exists():
+    is_iata = len(origin_code) == 3 and origin_code.isalpha()
+    if is_iata and not Airport.objects.filter(iata_code=origin_code).exists():
         return (
             'Origin airport "{}" not in database. Run: python manage.py load_world_airports.'.format(
                 origin_code or ''
@@ -322,6 +397,30 @@ def _nearest_alternate_empty_hint(origin_airport_code, final_destination_address
         'Set AMADEUS_API_KEY and AMADEUS_API_SECRET in .env for real flight search. '
         'See Documents/REAL_DATA_SETUP.md.'
     )
+
+
+def _smart_search_empty_hint(origin_query, destination_query, origin_radius_km, search_meta):
+    origins = search_meta.get('origin_airports_considered') or []
+    destinations = search_meta.get('destination_airports_considered') or []
+    no_ground = search_meta.get('origin_airports_without_ground') or []
+    origin_preview = ', '.join(origins[:8]) if origins else 'none'
+    destination_preview = ', '.join(destinations[:8]) if destinations else 'none'
+    hint = (
+        'No flights found for destination "{}" from your origin "{}" and nearby airports within {} km. '
+        'Checked origin airports: {}. Checked destination airports: {}. '
+        'Try a different date, larger radius, or another destination city/airport.'
+    ).format(
+        destination_query,
+        origin_query,
+        int(origin_radius_km),
+        origin_preview,
+        destination_preview,
+    )
+    if no_ground:
+        hint += ' Some nearby origins were skipped due to unavailable ground routes: {}.'.format(
+            ', '.join(no_ground[:8])
+        )
+    return hint
 
 
 @api_view(['POST'])

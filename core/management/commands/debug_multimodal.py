@@ -100,3 +100,15 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(
                 'Flights exist for date but no connections. Check that routes match (e.g. LHR->BRU, BRU->CDG, AMS->CDG, train BRU->AMS).'
             ))
+
+        self.stdout.write('')
+        self.stdout.write('Smart search sanity checks:')
+        for scenario in [('LUX', 'ZAG', 'Luxembourg -> Croatia'), ('LUX', 'PEK', 'Luxembourg -> China')]:
+            o, d, label = scenario
+            count = Flight.objects.filter(
+                origin_airport__iata_code=o,
+                destination_airport__iata_code=d,
+                departure_time__date=search_date
+            ).count()
+            self.stdout.write('  {}: {} direct flight(s) on {}'.format(label, count, search_date))
+        self.stdout.write('  Use API /api/nearest-alternate with origin_query="Luxembourg", destination_query="Croatia" or "China".')

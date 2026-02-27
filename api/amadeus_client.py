@@ -8,9 +8,6 @@ from django.conf import settings
 
 # Token cache (in production use Redis or similar)
 _token_cache = {'token': None, 'expires': 0}
-BASE_URL = 'https://test.api.amadeus.com'
-TOKEN_URL = BASE_URL + '/v1/security/oauth2/token'
-FLIGHT_OFFERS_URL = BASE_URL + '/v2/shopping/flight-offers'
 
 
 def _get_api_key():
@@ -34,6 +31,29 @@ def is_configured():
     return bool(_get_api_key() and _get_api_secret())
 
 
+def _normalize_base_url(url):
+    return (url or '').strip().rstrip('/')
+
+
+def _normalize_path(path):
+    value = (path or '').strip()
+    if not value:
+        return ''
+    return value if value.startswith('/') else '/' + value
+
+
+def _token_url():
+    base = _normalize_base_url(getattr(settings, 'AMADEUS_BASE_URL', ''))
+    path = _normalize_path(getattr(settings, 'AMADEUS_TOKEN_PATH', ''))
+    return base + path
+
+
+def _flight_offers_url():
+    base = _normalize_base_url(getattr(settings, 'AMADEUS_BASE_URL', ''))
+    path = _normalize_path(getattr(settings, 'AMADEUS_FLIGHT_OFFERS_PATH', ''))
+    return base + path
+
+
 def get_token():
     """Get OAuth token; use cache until near expiry."""
     now = time.time()
@@ -44,7 +64,7 @@ def get_token():
     if not key or not secret:
         return None
     resp = requests.post(
-        TOKEN_URL,
+        _token_url(),
         data={
             'grant_type': 'client_credentials',
             'client_id': key,
@@ -73,7 +93,7 @@ def _fetch_flight_offers_raw(origin_iata, destination_iata, departure_date, adul
         'adults': adults,
     }
     resp = requests.get(
-        FLIGHT_OFFERS_URL,
+        _flight_offers_url(),
         params=params,
         headers={'Authorization': 'Bearer ' + token},
         timeout=15,
