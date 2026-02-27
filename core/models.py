@@ -173,6 +173,32 @@ class UserProfile(models.Model):
         ('AUD', 'Australian Dollar (A$)'),
         ('CHF', 'Swiss Franc (CHF)'),
         ('CNY', 'Chinese Yuan (¥)'),
+        ('INR', 'Indian Rupee (₹)'),
+        ('AED', 'UAE Dirham (AED)'),
+        ('BRL', 'Brazilian Real (R$)'),
+        ('MXN', 'Mexican Peso (MX$)'),
+        ('SGD', 'Singapore Dollar (S$)'),
+        ('HKD', 'Hong Kong Dollar (HK$)'),
+        ('SEK', 'Swedish Krona (SEK)'),
+        ('NOK', 'Norwegian Krone (NOK)'),
+        ('DKK', 'Danish Krone (DKK)'),
+        ('NZD', 'New Zealand Dollar (NZ$)'),
+    ]
+    LANGUAGE_CHOICES = [
+        ('en', 'English'),
+        ('fr', 'French'),
+        ('de', 'German'),
+        ('lb', 'Luxembourgish'),
+        ('fa', 'Farsi'),
+        ('es', 'Spanish'),
+        ('it', 'Italian'),
+        ('pt', 'Portuguese'),
+        ('nl', 'Dutch'),
+        ('ar', 'Arabic'),
+        ('zh-hans', 'Chinese (Simplified)'),
+        ('ja', 'Japanese'),
+        ('ko', 'Korean'),
+        ('hi', 'Hindi'),
     ]
 
     user = models.OneToOneField(
@@ -203,6 +229,12 @@ class UserProfile(models.Model):
         choices=CURRENCY_CHOICES,
         default='EUR',
         help_text="Preferred currency for price display"
+    )
+    preferred_language = models.CharField(
+        max_length=10,
+        choices=LANGUAGE_CHOICES,
+        default='en',
+        help_text="Preferred UI language code"
     )
     location_latitude = models.DecimalField(
         max_digits=9, decimal_places=6, null=True, blank=True)

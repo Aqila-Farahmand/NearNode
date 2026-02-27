@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+{% load i18n %}
+<html lang="{{ ui_language|default:'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile - NearNode</title>
+    <title>{% trans "My Profile - NearNode" %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -32,7 +33,7 @@
             <div class="lg:col-span-2">
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-2xl font-bold mb-6">
-                        <i class="fas fa-user-circle mr-2"></i>Profile Information
+                        <i class="fas fa-user-circle mr-2"></i>{% trans "Profile Information" %}
                     </h2>
                     
                     <form method="POST" action="{% url 'profile' %}">
@@ -40,7 +41,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label for="first_name" class="block text-sm font-medium text-gray-700 mb-2">
-                                    First Name
+                                    {% trans "First Name" %}
                                 </label>
                                 <input type="text" id="first_name" name="first_name" 
                                     value="{{ profile.first_name }}"
@@ -48,7 +49,7 @@
                             </div>
                             <div>
                                 <label for="last_name" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Last Name
+                                    {% trans "Last Name" %}
                                 </label>
                                 <input type="text" id="last_name" name="last_name" 
                                     value="{{ profile.last_name }}"
@@ -56,7 +57,7 @@
                             </div>
                             <div>
                                 <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Email
+                                    {% trans "Email" %}
                                 </label>
                                 <input type="email" id="email" name="email" 
                                     value="{{ profile.email|default:user.email }}"
@@ -64,7 +65,7 @@
                             </div>
                             <div>
                                 <label for="phone_number" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Phone Number
+                                    {% trans "Phone Number" %}
                                 </label>
                                 <input type="tel" id="phone_number" name="phone_number" 
                                     value="{{ profile.phone_number }}"
@@ -72,11 +73,11 @@
                             </div>
                             <div>
                                 <label for="country_code" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Country
+                                    {% trans "Country" %}
                                 </label>
                                 <select id="country_code" name="country_code" 
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                    <option value="">Select country</option>
+                                    <option value="">{% trans "Select country" %}</option>
                                     {% for code, name in country_choices %}
                                         <option value="{{ code }}" {% if profile.country_code == code %}selected{% endif %}>{{ name }}</option>
                                     {% endfor %}
@@ -84,30 +85,36 @@
                             </div>
                             <div>
                                 <label for="currency" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Preferred Currency
+                                    {% trans "Preferred Currency" %}
                                 </label>
                                 <select id="currency" name="currency" 
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                    <option value="USD" {% if profile.currency == 'USD' %}selected{% endif %}>US Dollar ($)</option>
-                                    <option value="EUR" {% if profile.currency == 'EUR' %}selected{% endif %}>Euro (€)</option>
-                                    <option value="GBP" {% if profile.currency == 'GBP' %}selected{% endif %}>British Pound (£)</option>
-                                    <option value="JPY" {% if profile.currency == 'JPY' %}selected{% endif %}>Japanese Yen (¥)</option>
-                                    <option value="CAD" {% if profile.currency == 'CAD' %}selected{% endif %}>Canadian Dollar (C$)</option>
-                                    <option value="AUD" {% if profile.currency == 'AUD' %}selected{% endif %}>Australian Dollar (A$)</option>
-                                    <option value="CHF" {% if profile.currency == 'CHF' %}selected{% endif %}>Swiss Franc (CHF)</option>
-                                    <option value="CNY" {% if profile.currency == 'CNY' %}selected{% endif %}>Chinese Yuan (¥)</option>
+                                    {% for code, name in currency_choices %}
+                                        <option value="{{ code }}" {% if profile.currency == code %}selected{% endif %}>{{ name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="preferred_language" class="block text-sm font-medium text-gray-700 mb-2">
+                                    {% trans "Preferred Language" %}
+                                </label>
+                                <select id="preferred_language" name="preferred_language"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    {% for code, name in language_choices %}
+                                        <option value="{{ code }}" {% if profile.preferred_language == code %}selected{% endif %}>{{ name }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                             <div>
                                 <label for="home_airport" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Home Airport
+                                    {% trans "Home Airport" %}
                                 </label>
-                                <input type="text" id="home_airport_search" placeholder="Search by city, name or code (e.g. London, LHR)" 
+                                <input type="text" id="home_airport_search" placeholder="{% trans 'Search by city, name or code (e.g. London, LHR)' %}" 
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-2"
                                     autocomplete="off">
                                 <select id="home_airport" name="home_airport"
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                    <option value="">Select Airport</option>
+                                    <option value="">{% trans "Select Airport" %}</option>
                                     {% for airport in airports %}
                                         <option value="{{ airport.iata_code }}" 
                                             data-search="{{ airport.city }} {{ airport.name }} {{ airport.iata_code }} {{ airport.country }}"
@@ -124,16 +131,16 @@
                             <div>
                                 <button type="button" onclick="getCurrentLocation()" 
                                     class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 mr-2">
-                                    <i class="fas fa-map-marker-alt mr-2"></i>Use Current Location
+                                    <i class="fas fa-map-marker-alt mr-2"></i>{% trans "Use Current Location" %}
                                 </button>
                                 <button type="submit" 
                                     class="px-6 py-2 gradient-bg text-white rounded-lg hover:opacity-90">
-                                    <i class="fas fa-save mr-2"></i>Save Profile
+                        <i class="fas fa-save mr-2"></i>{% trans "Save Profile" %}
                                 </button>
                             </div>
                             <a href="{% url 'delete_account' %}" 
                                 class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
-                                <i class="fas fa-trash mr-2"></i>Delete Account
+                                <i class="fas fa-trash mr-2"></i>{% trans "Delete Account" %}
                             </a>
                         </div>
                         
@@ -147,7 +154,7 @@
             <div class="lg:col-span-1">
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-2xl font-bold mb-4">
-                        <i class="fas fa-bookmark mr-2"></i>Saved Trips
+                        <i class="fas fa-bookmark mr-2"></i>{% trans "Saved Trips" %}
                     </h2>
                     {% if saved_trips %}
                         <div class="space-y-4 max-h-96 overflow-y-auto">
@@ -164,12 +171,12 @@
                                             </p>
                                         </div>
                                         <button data-trip-id="{{ trip.id }}" 
-                                            class="unsave-trip-btn text-red-500 hover:text-red-700 ml-2 flex-shrink-0" title="Remove from saved">
+                                            class="unsave-trip-btn text-red-500 hover:text-red-700 ml-2 flex-shrink-0" title="{% trans 'Remove from saved' %}">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
                                     <p class="text-xs text-gray-500 mb-2">
-                                        Saved {{ trip.saved_at|date:"M d, Y" }}
+                                        {% trans "Saved" %} {{ trip.saved_at|date:"M d, Y" }}
                                     </p>
                                     {% if trip.destination_weather %}
                                     <p class="text-xs text-blue-600 mb-2">
@@ -180,46 +187,46 @@
                                         {% if trip.display_data %}
                                             {% with data=trip.display_data flight=data.flight airport=data.airport ground=data.ground_transport %}
                                             {% if flight %}
-                                            <p class="font-medium">Flight</p>
+                                            <p class="font-medium">{% trans "Flight" %}</p>
                                             <p>{{ flight.airline|default:"" }} {{ flight.flight_number|default:"" }}</p>
                                             <p>{% if flight.origin_airport %}{{ flight.origin_airport.iata_code|default:flight.origin_airport.name|default:"" }}{% endif %} → {% if flight.destination_airport %}{{ flight.destination_airport.iata_code|default:flight.destination_airport.name|default:"" }}{% endif %}</p>
                                             {% if flight.origin_airport and flight.destination_airport %}
                                             <p class="text-gray-600">{% if flight.origin_airport.city %}{{ flight.origin_airport.city }}{% if flight.origin_airport.country %}, {{ flight.origin_airport.country }}{% endif %}{% endif %} → {% if flight.destination_airport.city %}{{ flight.destination_airport.city }}{% if flight.destination_airport.country %}, {{ flight.destination_airport.country }}{% endif %}{% endif %}</p>
                                             {% endif %}
-                                            {% if flight.departure_time %}<p>Dep: {{ flight.departure_time }}</p>{% endif %}
-                                            {% if flight.arrival_time %}<p>Arr: {{ flight.arrival_time }}</p>{% endif %}
-                                            <p>Flight: €{{ data.flight_cost_eur|default:flight.price_eur|default:"—" }}</p>
+                                            {% if flight.departure_time %}<p>{% trans "Dep:" %} {{ flight.departure_time }}</p>{% endif %}
+                                            {% if flight.arrival_time %}<p>{% trans "Arr:" %} {{ flight.arrival_time }}</p>{% endif %}
+                                            <p>{% trans "Flight:" %} €{{ data.flight_cost_eur|default:flight.price_eur|default:"—" }}</p>
                                             {% endif %}
                                             {% if airport %}
-                                            <p class="mt-2 font-medium">Alternate airport</p>
+                                            <p class="mt-2 font-medium">{% trans "Alternate airport" %}</p>
                                             <p>{{ airport.name|default:"" }} ({{ airport.iata_code|default:"" }})</p>
-                                            {% if data.distance_to_destination_km %}<p>{{ data.distance_to_destination_km|floatformat:1 }} km to destination</p>{% endif %}
+                                            {% if data.distance_to_destination_km %}<p>{{ data.distance_to_destination_km|floatformat:1 }} {% trans "km to destination" %}</p>{% endif %}
                                             {% endif %}
                                             {% if ground %}
-                                            <p class="mt-2 font-medium">Ground</p>
+                                            <p class="mt-2 font-medium">{% trans "Ground" %}</p>
                                             <p>{{ ground.name|default:"" }} €{{ data.ground_cost_eur|default:ground.cost_eur|default:"—" }}</p>
                                             {% endif %}
                                             {% endwith %}
                                         {% elif trip.flight %}
-                                            <p class="font-medium">Flight</p>
+                                            <p class="font-medium">{% trans "Flight" %}</p>
                                             <p>{{ trip.flight.airline }} {{ trip.flight.flight_number }}</p>
                                             <p>{{ trip.flight.origin_airport.iata_code }} → {{ trip.flight.destination_airport.iata_code }}</p>
-                                            <p>Dep: {{ trip.flight.departure_time|date:"M d, H:i" }} · Arr: {{ trip.flight.arrival_time|date:"M d, H:i" }}</p>
+                                            <p>{% trans "Dep:" %} {{ trip.flight.departure_time|date:"M d, H:i" }} · {% trans "Arr:" %} {{ trip.flight.arrival_time|date:"M d, H:i" }}</p>
                                             <p>€{{ trip.flight.price_eur }}</p>
                                         {% elif trip.flight_connection %}
-                                            <p class="font-medium">Connection</p>
+                                            <p class="font-medium">{% trans "Connection" %}</p>
                                             <p>{{ trip.flight_connection.first_flight.airline }} {{ trip.flight_connection.first_flight.flight_number }}: {{ trip.flight_connection.first_flight.origin_airport.iata_code }} → {{ trip.flight_connection.first_flight.destination_airport.iata_code }}</p>
                                             {% if trip.flight_connection.second_flight %}
                                             <p>{{ trip.flight_connection.second_flight.airline }} {{ trip.flight_connection.second_flight.flight_number }}: {{ trip.flight_connection.second_flight.origin_airport.iata_code }} → {{ trip.flight_connection.second_flight.destination_airport.iata_code }}</p>
                                             {% endif %}
                                             {% if trip.flight_connection.ground_transport %}
-                                            <p>Ground: {{ trip.flight_connection.ground_transport.name }}</p>
+                                            <p>{% trans "Ground:" %} {{ trip.flight_connection.ground_transport.name }}</p>
                                             {% endif %}
                                             <p>€{{ trip.flight_connection.total_cost_eur }}</p>
                                         {% endif %}
                                     </div>
                                     <button type="button" class="trip-toggle-details text-blue-600 hover:text-blue-800 text-xs mt-1" data-trip-id="{{ trip.id }}" aria-expanded="false">
-                                        <i class="fas fa-chevron-down mr-1"></i><span class="trip-toggle-text">View flight details</span>
+                                        <i class="fas fa-chevron-down mr-1"></i><span class="trip-toggle-text">{% trans "View flight details" %}</span>
                                     </button>
                                 </div>
                             {% endfor %}
@@ -227,7 +234,7 @@
                     {% else %}
                         <p class="text-gray-500 text-center py-8">
                             <i class="fas fa-inbox text-4xl mb-4 block"></i>
-                            No saved trips yet
+                            {% trans "No saved trips yet" %}
                         </p>
                     {% endif %}
                 </div>
@@ -236,15 +243,31 @@
     </div>
 
     <script>
+        const I18N = {
+            geolocationUnsupported: "{% trans 'Geolocation is not supported by your browser.' %}",
+            gettingLocation: "{% trans 'Getting location...' %}",
+            nearestAirportSetPrefix: "{% trans 'Nearest airport set to' %}",
+            kmAway: "{% trans 'km away' %}",
+            clickSaveProfile: "{% trans 'Click \"Save Profile\" to update.' %}",
+            locationSavedNoAirport: "{% trans 'Location saved. No airport found in database.' %}",
+            locationSavedFetchFail: "{% trans 'Location saved. Could not fetch nearest airport.' %}",
+            useCurrentLocation: "{% trans 'Use Current Location' %}",
+            unableToGetLocation: "{% trans 'Unable to get your location. Please allow location access or enter it manually.' %}",
+            removeTripConfirm: "{% trans 'Remove this trip from saved trips?' %}",
+            errorPrefix: "{% trans 'Error:' %}",
+            hideFlightDetails: "{% trans 'Hide flight details' %}",
+            viewFlightDetails: "{% trans 'View flight details' %}"
+        };
+
         function getCurrentLocation() {
             if (!navigator.geolocation) {
-                alert('Geolocation is not supported by your browser.');
+                alert(I18N.geolocationUnsupported);
                 return;
             }
             const btn = document.querySelector('button[onclick="getCurrentLocation()"]');
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Getting location...';
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>' + I18N.gettingLocation;
             }
             navigator.geolocation.getCurrentPosition(
                 function(position) {
@@ -262,34 +285,34 @@
                         if (data.iata_code) {
                             const sel = document.getElementById('home_airport');
                             sel.value = data.iata_code;
-                            const dist = data.distance_km == null ? '' : ' (' + data.distance_km + ' km away)';
-                            alert('Nearest airport set to ' + data.iata_code + dist + '. Click "Save Profile" to update.');
+                            const dist = data.distance_km == null ? '' : ' (' + data.distance_km + ' ' + I18N.kmAway + ')';
+                            alert(I18N.nearestAirportSetPrefix + ' ' + data.iata_code + dist + '. ' + I18N.clickSaveProfile);
                         } else {
-                            alert('Location saved. No airport found in database. Click "Save Profile" to update.');
+                            alert(I18N.locationSavedNoAirport + ' ' + I18N.clickSaveProfile);
                         }
                     })
                     .catch(function() {
-                        alert('Location saved. Could not fetch nearest airport. Click "Save Profile" to update.');
+                        alert(I18N.locationSavedFetchFail + ' ' + I18N.clickSaveProfile);
                     })
                     .finally(function() {
                         if (btn) {
                             btn.disabled = false;
-                            btn.innerHTML = '<i class="fas fa-map-marker-alt mr-2"></i>Use Current Location';
+                            btn.innerHTML = '<i class="fas fa-map-marker-alt mr-2"></i>' + I18N.useCurrentLocation;
                         }
                     });
                 },
                 function(error) {
                     if (btn) {
                         btn.disabled = false;
-                        btn.innerHTML = '<i class="fas fa-map-marker-alt mr-2"></i>Use Current Location';
+                        btn.innerHTML = '<i class="fas fa-map-marker-alt mr-2"></i>' + I18N.useCurrentLocation;
                     }
-                    alert('Unable to get your location. Please allow location access or enter it manually.');
+                    alert(I18N.unableToGetLocation);
                 }
             );
         }
 
         function unsaveTrip(tripId) {
-            if (confirm('Remove this trip from saved trips?')) {
+            if (confirm(I18N.removeTripConfirm)) {
                 fetch('/api/unsave-trip/', {
                     method: 'POST',
                     headers: {
@@ -303,7 +326,7 @@
                     if (data.success) {
                         location.reload();
                     } else {
-                        alert('Error: ' + data.error);
+                        alert(I18N.errorPrefix + ' ' + data.error);
                     }
                 });
             }
@@ -346,7 +369,7 @@
                     const icon = toggleBtn.querySelector('i.fas');
                     const text = toggleBtn.querySelector('.trip-toggle-text');
                     if (icon) icon.className = isHidden ? 'fas fa-chevron-up mr-1' : 'fas fa-chevron-down mr-1';
-                    if (text) text.textContent = isHidden ? 'Hide flight details' : 'View flight details';
+                    if (text) text.textContent = isHidden ? I18N.hideFlightDetails : I18N.viewFlightDetails;
                 }
             }
             document.querySelectorAll('.trip-toggle-details').forEach(function(btn) {

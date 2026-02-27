@@ -1,10 +1,10 @@
-{% load socialaccount %}
+{% load socialaccount i18n %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign in with Google - NearNode</title>
+    <title>{% trans "Sign in with Google - NearNode" %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -34,8 +34,8 @@
                     <i class="fas fa-plane text-4xl text-blue-600"></i>
                     <h1 class="text-4xl font-bold text-gray-900">NearNode</h1>
                 </div>
-                <h2 class="text-2xl font-semibold text-gray-700">Sign in with Google</h2>
-                <p class="text-gray-500 mt-2">Redirecting to Google...</p>
+                <h2 class="text-2xl font-semibold text-gray-700">{% trans "Sign in with Google" %}</h2>
+                <p class="text-gray-500 mt-2">{% trans "Redirecting to Google..." %}</p>
             </div>
 
             <!-- Loading Card -->
@@ -44,9 +44,9 @@
                     <div class="spinner"></div>
                     <div class="flex items-center space-x-3 text-gray-700">
                         <i class="fab fa-google text-red-500 text-2xl"></i>
-                        <span class="text-lg font-medium">Connecting to Google</span>
+                        <span class="text-lg font-medium">{% trans "Connecting to Google" %}</span>
                     </div>
-                    <p class="text-sm text-gray-500">You will be redirected to Google to complete sign in</p>
+                    <p class="text-sm text-gray-500">{% trans "You will be redirected to Google to complete sign in" %}</p>
                 </div>
             </div>
 
@@ -79,7 +79,7 @@
                     <form method="post" action="{% provider_login_url provider.id process=process scope=scope auth_params=auth_params %}" style="display: none;">
                         {% csrf_token %}
                         <button type="submit" id="google-login-btn">
-                            <i class="fab fa-google mr-2"></i>Sign in with Google
+                            <i class="fab fa-google mr-2"></i>{% trans "Sign in with Google" %}
                         </button>
                     </form>
                 {% endif %}
@@ -87,19 +87,19 @@
 
             <!-- Manual redirect button (fallback) -->
             <div class="text-center">
-                <p class="text-sm text-gray-500 mb-4">If you are not redirected automatically:</p>
+                <p class="text-sm text-gray-500 mb-4">{% trans "If you are not redirected automatically:" %}</p>
                 {% for provider in socialaccount_providers %}
                     {% if provider.id == "google" %}
                         <a href="{% provider_login_url provider.id process=process scope=scope auth_params=auth_params %}" 
                            class="inline-flex items-center px-6 py-3 gradient-bg text-white rounded-lg font-semibold hover:opacity-90 transition-opacity">
                             <i class="fab fa-google mr-2"></i>
-                            Continue to Google
+                            {% trans "Continue to Google" %}
                         </a>
                     {% endif %}
                 {% endfor %}
                 <div class="mt-4">
                     <a href="{% url 'home' %}" class="text-gray-600 hover:text-gray-800 text-sm">
-                        <i class="fas fa-arrow-left mr-2"></i>Back to Home
+                        <i class="fas fa-arrow-left mr-2"></i>{% trans "Back to Home" %}
                     </a>
                 </div>
             </div>

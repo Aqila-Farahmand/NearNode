@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+{% load i18n %}
+<html lang="{{ ui_language|default:'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NearNode - Smart Travel Planning</title>
+    <title>{% trans "NearNode - Smart Travel Planning" %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -39,19 +40,19 @@
         <div class="bg-white rounded-lg shadow-md mb-6">
             <div class="flex border-b">
                 <button class="tab-btn active px-6 py-4 font-semibold border-b-2 text-gray-600" data-tab="nearest-alternate">
-                    <i class="fas fa-map-marker-alt mr-2"></i>Nearest Alternate
+                    <i class="fas fa-map-marker-alt mr-2"></i>{% trans "Nearest Alternate" %}
                 </button>
                 <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="multi-modal">
-                    <i class="fas fa-train mr-2"></i>Multi-Modal
+                    <i class="fas fa-train mr-2"></i>{% trans "Multi-Modal" %}
                 </button>
                 <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="ai-search">
-                    <i class="fas fa-search mr-2"></i>AI Search
+                    <i class="fas fa-search mr-2"></i>{% trans "AI Search" %}
                 </button>
                 <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="collaborative">
-                    <i class="fas fa-heart mr-2"></i>Collaborative
+                    <i class="fas fa-heart mr-2"></i>{% trans "Collaborative" %}
                 </button>
                 <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="delay-check">
-                    <i class="fas fa-shield-alt mr-2"></i>Delay Protection
+                    <i class="fas fa-shield-alt mr-2"></i>{% trans "Delay Protection" %}
                 </button>
             </div>
         </div>
@@ -59,54 +60,54 @@
         <!-- Feature 1: Nearest Alternate -->
         <div id="nearest-alternate" class="tab-content">
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4">Nearest Alternate Optimization</h2>
-                <p class="text-gray-600 mb-6">Find cheaper flights to nearby airports and calculate total trip cost</p>
+                <h2 class="text-2xl font-bold mb-4">{% trans "Nearest Alternate Optimization" %}</h2>
+                <p class="text-gray-600 mb-6">{% trans "Find cheaper flights to nearby airports and calculate total trip cost" %}</p>
                 
                 <form id="nearestAlternateForm" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label for="origin_query" class="block text-sm font-medium text-gray-700 mb-2">Your Origin (city/address/airport)</label>
-                            <input type="text" id="origin_query" name="origin_query" placeholder="e.g., Luxembourg or LUX" required
+                            <label for="origin_query" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Your Origin (city/address/airport)" %}</label>
+                            <input type="text" id="origin_query" name="origin_query" placeholder="{% trans 'e.g., Luxembourg or LUX' %}" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label for="destination_query" class="block text-sm font-medium text-gray-700 mb-2">Destination (country/city/airport)</label>
-                            <input type="text" id="destination_query" name="destination_query" placeholder="e.g., Croatia or ZAG" required
+                            <label for="destination_query" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Destination (country/city/airport)" %}</label>
+                            <input type="text" id="destination_query" name="destination_query" placeholder="{% trans 'e.g., Croatia or ZAG' %}" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label for="nearest_alternate_date" class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                            <label for="nearest_alternate_date" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Date" %}</label>
                             <input type="date" id="nearest_alternate_date" name="date" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label for="origin_radius_km" class="block text-sm font-medium text-gray-700 mb-2">Origin Radius (km)</label>
+                            <label for="origin_radius_km" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Origin Radius (km)" %}</label>
                             <input type="number" id="origin_radius_km" name="origin_radius_km" value="220" min="10" max="800"
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label for="sort_by" class="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                            <label for="sort_by" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Sort By" %}</label>
                             <select id="sort_by" name="sort_by" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                <option value="cost">Total Cost</option>
-                                <option value="duration">Total Duration</option>
-                                <option value="origin_distance_km">Distance from Origin</option>
+                                <option value="cost">{% trans "Total Cost" %}</option>
+                                <option value="duration">{% trans "Total Duration" %}</option>
+                                <option value="origin_distance_km">{% trans "Distance from Origin" %}</option>
                             </select>
                         </div>
                         <div>
-                            <label for="sort_order" class="block text-sm font-medium text-gray-700 mb-2">Sort Order</label>
+                            <label for="sort_order" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Sort Order" %}</label>
                             <select id="sort_order" name="sort_order" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                <option value="asc">Ascending</option>
-                                <option value="desc">Descending</option>
+                                <option value="asc">{% trans "Ascending" %}</option>
+                                <option value="desc">{% trans "Descending" %}</option>
                             </select>
                         </div>
                         <div>
-                            <label for="max_results" class="block text-sm font-medium text-gray-700 mb-2">Max Results</label>
+                            <label for="max_results" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Max Results" %}</label>
                             <input type="number" id="max_results" name="max_results" value="20" min="1" max="100"
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                     </div>
                     <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
-                        <i class="fas fa-search mr-2"></i>Search
+                        <i class="fas fa-search mr-2"></i>{% trans "Search" %}
                     </button>
                 </form>
             </div>
@@ -116,29 +117,29 @@
         <!-- Feature 2: Multi-Modal -->
         <div id="multi-modal" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4">Multi-Modal Connection Logic</h2>
-                <p class="text-gray-600 mb-6">Find connections with train links and layover quality scores</p>
+                <h2 class="text-2xl font-bold mb-4">{% trans "Multi-Modal Connection Logic" %}</h2>
+                <p class="text-gray-600 mb-6">{% trans "Find connections with train links and layover quality scores" %}</p>
                 
                 <form id="multiModalForm" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label for="multi_modal_origin" class="block text-sm font-medium text-gray-700 mb-2">Origin Airport</label>
-                            <input type="text" id="multi_modal_origin" name="origin_airport_code" placeholder="e.g., BRU" required
+                            <label for="multi_modal_origin" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Origin Airport" %}</label>
+                            <input type="text" id="multi_modal_origin" name="origin_airport_code" placeholder="{% trans 'e.g., BRU' %}" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label for="multi_modal_destination" class="block text-sm font-medium text-gray-700 mb-2">Destination Airport</label>
-                            <input type="text" id="multi_modal_destination" name="destination_airport_code" placeholder="e.g., AMS" required
+                            <label for="multi_modal_destination" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Destination Airport" %}</label>
+                            <input type="text" id="multi_modal_destination" name="destination_airport_code" placeholder="{% trans 'e.g., AMS' %}" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label for="multi_modal_date" class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                            <label for="multi_modal_date" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Date" %}</label>
                             <input type="date" id="multi_modal_date" name="date" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                     </div>
                     <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
-                        <i class="fas fa-search mr-2"></i>Find Connections
+                        <i class="fas fa-search mr-2"></i>{% trans "Find Connections" %}
                     </button>
                 </form>
             </div>
@@ -148,13 +149,13 @@
         <!-- Feature 3: AI Search -->
         <div id="ai-search" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4">AI Search</h2>
-                <p class="text-gray-600 mb-6">Write your trip in plain text — e.g. origin, destination type, budget, or dates.</p>
+                <h2 class="text-2xl font-bold mb-4">{% trans "AI Search" %}</h2>
+                <p class="text-gray-600 mb-6">{% trans "Write your trip in plain text — e.g. origin, destination type, budget, or dates." %}</p>
                 
                 <form id="aiSearchForm" class="space-y-4">
                     <div>
-                        <label for="ai_query" class="block text-sm font-medium text-gray-700 mb-2">Describe your trip (free text)</label>
-                        <textarea id="ai_query" name="query" rows="3" placeholder='e.g., From Milan I want a warm beach under €300, max 5 hours flight'
+                        <label for="ai_query" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Describe your trip (free text)" %}</label>
+                        <textarea id="ai_query" name="query" rows="3" placeholder='{% trans "e.g., From Milan I want a warm beach under €300, max 5 hours flight" %}'
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required></textarea>
                     </div>
                     <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
@@ -168,25 +169,25 @@
         <!-- Feature 4: Collaborative -->
         <div id="collaborative" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4">Collaborative Trip Planning</h2>
-                <p class="text-gray-600 mb-6">Plan trips together with your partner</p>
+                <h2 class="text-2xl font-bold mb-4">{% trans "Collaborative Trip Planning" %}</h2>
+                <p class="text-gray-600 mb-6">{% trans "Plan trips together with your partner" %}</p>
                 
                 <div class="space-y-4">
                     <div class="border-l-4 border-blue-500 pl-4">
-                        <h3 class="font-semibold mb-2">Step 1: Generate Sync Code</h3>
+                        <h3 class="font-semibold mb-2">{% trans "Step 1: Generate Sync Code" %}</h3>
                         <button id="generateCodeBtn" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-                            Generate Code
+                            {% trans "Generate Code" %}
                         </button>
                         <div id="syncCodeDisplay" class="mt-2"></div>
                     </div>
                     
                     <div class="border-l-4 border-green-500 pl-4">
-                        <h3 class="font-semibold mb-2">Step 2: Link Partner</h3>
+                        <h3 class="font-semibold mb-2">{% trans "Step 2: Link Partner" %}</h3>
                         <div class="flex space-x-2">
-                            <input type="text" id="partnerSyncCode" placeholder="Enter partner's code"
+                            <input type="text" id="partnerSyncCode" placeholder="{% trans 'Enter partner code' %}"
                                 class="flex-1 px-4 py-2 border border-gray-300 rounded-lg">
                             <button id="linkPartnerBtn" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
-                                Link
+                                {% trans "Link" %}
                             </button>
                         </div>
                     </div>
@@ -198,17 +199,17 @@
         <!-- Feature 5: Delay Protection -->
         <div id="delay-check" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4">Delay Prediction & Self-Transfer Insurance</h2>
-                <p class="text-gray-600 mb-6">Check delay probability and self-transfer safety</p>
+                <h2 class="text-2xl font-bold mb-4">{% trans "Delay Prediction & Self-Transfer Insurance" %}</h2>
+                <p class="text-gray-600 mb-6">{% trans "Check delay probability and self-transfer safety" %}</p>
                 
                 <form id="delayCheckForm" class="space-y-4">
                     <div>
-                        <label for="flight_id" class="block text-sm font-medium text-gray-700 mb-2">Flight ID</label>
-                        <input type="number" id="flight_id" name="flight_id" placeholder="Enter flight ID" required
+                        <label for="flight_id" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Flight ID" %}</label>
+                        <input type="number" id="flight_id" name="flight_id" placeholder="{% trans 'Enter flight ID' %}" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                     </div>
                     <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
-                        <i class="fas fa-shield-alt mr-2"></i>Check Delay Risk
+                        <i class="fas fa-shield-alt mr-2"></i>{% trans "Check Delay Risk" %}
                     </button>
                 </form>
             </div>
@@ -218,6 +219,62 @@
 
     <script>
         const API_BASE = '/api';
+        const I18N = {
+            option: "{% trans 'Option' %}",
+            totalCost: "{% trans 'Total Cost' %}",
+            flightCost: "{% trans 'Flight Cost' %}",
+            groundTransport: "{% trans 'Ground Transport' %}",
+            totalTime: "{% trans 'Total Time' %}",
+            groundLabel: "{% trans 'Ground:' %}",
+            flightLabel: "{% trans 'Flight:' %}",
+            saveTrip: "{% trans 'Save Trip' %}",
+            pleaseLoginSaveTrips: "{% trans 'Please login to save trips' %}",
+            tripSavedSuccess: "{% trans 'Trip saved successfully! View it in your profile.' %}",
+            failedSaveTrip: "{% trans 'Failed to save trip' %}",
+            errorPrefix: "{% trans 'Error:' %}",
+            searchingConnections: "{% trans 'Searching connections...' %}",
+            direct: "{% trans 'Direct' %}",
+            trainLink: "{% trans 'Train Link' %}",
+            connection: "{% trans 'Connection' %}",
+            qualityScore: "{% trans 'Quality Score' %}",
+            noConnectionsFound: "{% trans 'No connections found' %}",
+            searching: "{% trans 'Searching...' %}",
+            requestFailed: "{% trans 'Request failed' %}",
+            loginAndTryAgain: "{% trans 'log in and try again' %}",
+            from: "{% trans 'From' %}",
+            type: "{% trans 'Type' %}",
+            budget: "{% trans 'Budget' %}",
+            upTo: "{% trans 'Up to' %}",
+            weather: "{% trans 'Weather' %}",
+            noFiltersExtracted: "{% trans 'No filters extracted' %}",
+            duration: "{% trans 'Duration' %}",
+            dep: "{% trans 'Dep:' %}",
+            arr: "{% trans 'Arr:' %}",
+            match: "{% trans 'Match' %}",
+            parsedWithOllama: "{% trans 'Parsed with Ollama' %}",
+            parsedWithGroq: "{% trans 'Parsed with Groq' %}",
+            parsedWith: "{% trans 'Parsed with' %}",
+            destinationWeatherOn: "{% trans 'Destination weather: on' %}",
+            aiConfidence: "{% trans 'AI confidence' %}",
+            whatWeUnderstood: "{% trans 'What we understood' %}",
+            noMatchesHint: "{% trans 'No matches found. Try adjusting your query or add more flights to the database.' %}",
+            enterSyncCode: "{% trans 'Please enter a sync code' %}",
+            partnerLinked: "{% trans 'Partner linked successfully!' %}",
+            delayPrediction: "{% trans 'Delay Prediction' %}",
+            delayProbability: "{% trans 'Delay Probability:' %}",
+            averageDelay: "{% trans 'Average Delay:' %}",
+            sampleSize: "{% trans 'Sample Size:' %}",
+            minutes: "{% trans 'minutes' %}",
+            flights: "{% trans 'flights' %}",
+            searchAirlineBooking: "{% trans 'Search airline & booking options' %}",
+            noResults: "{% trans 'No results found.' %}",
+            fromYourLocation: "{% trans 'from your location' %}",
+            fromDestinationCenter: "{% trans 'from destination center' %}",
+            searchingFlights: "{% trans 'Searching flights...' %}",
+            checkedOrigins: "{% trans 'Checked origins:' %}",
+            checkedDestinations: "{% trans 'Checked destinations:' %}",
+            apiSort: "{% trans 'API sort:' %}"
+        };
         
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -247,7 +304,7 @@
                 data.final_destination_address = data.destination_query || '';
             }
             const container = document.getElementById('nearestAlternateResults');
-            container.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Searching flights...</p>';
+            container.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>' + I18N.searchingFlights + '</p>';
             try {
                 const response = await fetch(`${API_BASE}/nearest-alternate/`, {
                     method: 'POST',
@@ -285,8 +342,19 @@
         }
 
         function getCurrencySymbol(currency) {
-            const symbols = { EUR: '€', USD: '$', GBP: '£' };
-            return symbols[currency] || currency;
+            try {
+                const parts = new Intl.NumberFormat(undefined, {
+                    style: 'currency',
+                    currency: currency || 'EUR',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).formatToParts(0);
+                const currencyPart = parts.find((p) => p.type === 'currency');
+                return currencyPart ? currencyPart.value : (currency || 'EUR');
+            } catch (e) {
+                console.warn('Invalid currency code for formatter', currency, e);
+                return currency || 'EUR';
+            }
         }
 
         function buildNearestAlternateCard(result, idx, currencySymbol, exchangeRate) {
@@ -318,37 +386,37 @@
                 <div class="bg-white rounded-lg shadow-md p-6 card-hover">
                     <div class="flex justify-between items-start mb-4">
                         <div>
-                            <h3 class="text-xl font-bold">Option ${idx + 1}</h3>
+                            <h3 class="text-xl font-bold">${I18N.option} ${idx + 1}</h3>
                             <p class="text-gray-700">${originLabel} <i class="fas fa-arrow-right mx-1 text-xs"></i> ${destinationLabel}</p>
-                            <p class="text-sm text-gray-500">${originDistance} km from your location · ${destinationDistance} km from destination center</p>
+                            <p class="text-sm text-gray-500">${originDistance} km ${I18N.fromYourLocation} · ${destinationDistance} km ${I18N.fromDestinationCenter}</p>
                         </div>
                         <div class="text-right">
                             <p class="text-2xl font-bold text-green-600">${currencySymbol}${totalCost.toFixed(2)}</p>
-                            <p class="text-sm text-gray-600">Total Cost</p>
+                            <p class="text-sm text-gray-600">${I18N.totalCost}</p>
                         </div>
                     </div>
                     <div class="mb-4 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-900">
-                        <span class="font-semibold">Ground:</span> ${groundSummary} (${groundMode}) · ${groundHours}h ${groundMinsOnly}m
+                        <span class="font-semibold">${I18N.groundLabel}</span> ${groundSummary} (${groundMode}) · ${groundHours}h ${groundMinsOnly}m
                         <span class="mx-2">|</span>
-                        <span class="font-semibold">Flight:</span> ${origin} → ${dest} · ${flightHours}h ${flightMinsOnly}m
+                        <span class="font-semibold">${I18N.flightLabel}</span> ${origin} → ${dest} · ${flightHours}h ${flightMinsOnly}m
                     </div>
                     <div class="grid grid-cols-2 gap-4 mt-4">
                         <div>
-                            <p class="text-sm text-gray-600">Flight Cost</p>
+                            <p class="text-sm text-gray-600">${I18N.flightCost}</p>
                             <p class="font-semibold">${currencySymbol}${flightCost.toFixed(2)}</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-600">Ground Transport</p>
+                            <p class="text-sm text-gray-600">${I18N.groundTransport}</p>
                             <p class="font-semibold">${currencySymbol}${groundCost.toFixed(2)}</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-600">Total Time</p>
+                            <p class="text-sm text-gray-600">${I18N.totalTime}</p>
                             <p class="font-semibold">${timeH}h ${timeM}m</p>
                         </div>
                         <div class="flex flex-col items-start space-y-2 sm:items-end sm:space-y-0 sm:flex-row sm:space-x-3">
                             <button onclick="saveTripByIndex(${idx})" 
                                 class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
-                                <i class="fas fa-bookmark mr-1"></i>Save Trip
+                                <i class="fas fa-bookmark mr-1"></i>${I18N.saveTrip}
                             </button>
                             ${bookingLinkHtml || ''}
                         </div>
@@ -368,8 +436,8 @@
             const destinationText = destinations.length ? destinations.join(', ') : 'none';
             return (
                 '<div class="mb-3 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">' +
-                '<p><span class="font-semibold">Checked origins:</span> ' + originText + '</p>' +
-                '<p><span class="font-semibold">Checked destinations:</span> ' + destinationText + '</p>' +
+                '<p><span class="font-semibold">' + I18N.checkedOrigins + '</span> ' + originText + '</p>' +
+                '<p><span class="font-semibold">' + I18N.checkedDestinations + '</span> ' + destinationText + '</p>' +
                 '</div>'
             );
         }
@@ -428,11 +496,11 @@
             const mode = selectedMode;
             return (
                 '<div class="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-white p-3">' +
-                '<span class="text-sm font-semibold text-gray-700 mr-2">Sort results:</span>' +
-                '<button type="button" onclick="applyNearestResultsSort(\'best\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'best' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">Best</button>' +
-                '<button type="button" onclick="applyNearestResultsSort(\'cheapest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'cheapest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">Cheapest</button>' +
-                '<button type="button" onclick="applyNearestResultsSort(\'quickest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'quickest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">Quickest</button>' +
-                '<button type="button" onclick="applyNearestResultsSort(\'nearest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'nearest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">Nearest Airport</button>' +
+                '<span class="text-sm font-semibold text-gray-700 mr-2">{% trans "Sort results:" %}</span>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'best\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'best' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Best" %}</button>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'cheapest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'cheapest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Cheapest" %}</button>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'quickest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'quickest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Quickest" %}</button>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'nearest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'nearest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Nearest Airport" %}</button>' +
                 '</div>'
             );
         }
@@ -451,7 +519,7 @@
             globalThis.lastNearestSortMode = mode || 'best';
 
             if (!sorted.length) {
-                container.innerHTML = searchMetaHtml + '<p class="text-gray-600">No results found.' + (data.hint ? ' ' + data.hint : '') + '</p>';
+                container.innerHTML = searchMetaHtml + '<p class="text-gray-600">' + I18N.noResults + (data.hint ? ' ' + data.hint : '') + '</p>';
                 return;
             }
 
@@ -459,7 +527,7 @@
             container.innerHTML =
                 searchMetaHtml +
                 buildPostSearchSortBar(mode || 'best') +
-                '<div class="mb-3 text-sm text-gray-600">API sort: <span class="font-semibold">' + serverSortLabel + '</span></div>' +
+                '<div class="mb-3 text-sm text-gray-600">' + I18N.apiSort + ' <span class="font-semibold">' + serverSortLabel + '</span></div>' +
                 sorted.map((result, idx) => buildNearestAlternateCard(result, idx, currencySymbol, exchangeRate)).join('');
         }
 
@@ -540,18 +608,18 @@
                     body: JSON.stringify(payload)
                 });
                 if (response.status === 403) {
-                    alert('Please login to save trips');
+                    alert(I18N.pleaseLoginSaveTrips);
                     globalThis.location.href = '/login/';
                     return;
                 }
                 const result = await response.json();
                 if (result.success) {
-                    alert('Trip saved successfully! View it in your profile.');
+                    alert(I18N.tripSavedSuccess);
                 } else {
-                    alert('Error: ' + (result.error || 'Failed to save trip'));
+                    alert(I18N.errorPrefix + ' ' + (result.error || I18N.failedSaveTrip));
                 }
             } catch (error) {
-                alert('Error saving trip: ' + error.message);
+                alert(I18N.errorPrefix + ' ' + error.message);
             }
         }
 
@@ -561,7 +629,7 @@
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
             const container = document.getElementById('multiModalResults');
-            container.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Searching connections...</p>';
+            container.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>' + I18N.searchingConnections + '</p>';
             try {
                 const response = await fetch(`${API_BASE}/multi-modal/`, {
                     method: 'POST',
@@ -571,7 +639,7 @@
                 const result = await response.json();
                 displayMultiModalResults(result);
             } catch (error) {
-                document.getElementById('multiModalResults').innerHTML = '<p class="text-red-600">Error: ' + error.message + '</p>';
+                document.getElementById('multiModalResults').innerHTML = '<p class="text-red-600">' + I18N.errorPrefix + ' ' + error.message + '</p>';
             }
         });
 
@@ -583,11 +651,11 @@
                 data.connections.forEach((conn, idx) => {
                     let connectionTypeLabel;
                     if (conn.type === 'direct') {
-                        connectionTypeLabel = 'Direct';
+                        connectionTypeLabel = I18N.direct;
                     } else if (conn.type === 'train_link') {
-                        connectionTypeLabel = 'Train Link';
+                        connectionTypeLabel = I18N.trainLink;
                     } else {
-                        connectionTypeLabel = 'Connection';
+                        connectionTypeLabel = I18N.connection;
                     }
                     
                     const card = `
@@ -597,7 +665,7 @@
                                     <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
                                         ${connectionTypeLabel}
                                     </span>
-                                    <p class="text-sm text-gray-600 mt-2">Quality Score: ${conn.connection_quality_score.toFixed(1)}/10</p>
+                                    <p class="text-sm text-gray-600 mt-2">${I18N.qualityScore}: ${conn.connection_quality_score.toFixed(1)}/10</p>
                                 </div>
                                 <div class="text-right">
                                     <p class="text-2xl font-bold text-green-600">€${conn.total_cost_eur.toFixed(2)}</p>
@@ -609,7 +677,7 @@
                     container.innerHTML += card;
                 });
             } else {
-                container.innerHTML = '<p class="text-gray-600">No connections found</p>';
+                container.innerHTML = '<p class="text-gray-600">' + I18N.noConnectionsFound + '</p>';
             }
         }
 
@@ -619,7 +687,7 @@
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
             const resultsEl = document.getElementById('aiSearchResults');
-            resultsEl.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Searching...</p>';
+            resultsEl.innerHTML = '<p class="text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>' + I18N.searching + '</p>';
             try {
                 const response = await fetch(`${API_BASE}/ai-search/`, {
                     method: 'POST',
@@ -632,30 +700,30 @@
                 });
                 const result = await response.json().catch(() => ({}));
                 if (!response.ok) {
-                    const msg = result.detail || result.error || response.statusText || 'Request failed';
-                    resultsEl.innerHTML = '<p class="text-red-600">' + msg + (response.status === 401 ? ' (log in and try again)' : '') + '</p>';
+                    const msg = result.detail || result.error || response.statusText || I18N.requestFailed;
+                    resultsEl.innerHTML = '<p class="text-red-600">' + msg + (response.status === 401 ? ' (' + I18N.loginAndTryAgain + ')' : '') + '</p>';
                     return;
                 }
                 if (result.error) {
-                    resultsEl.innerHTML = '<p class="text-red-600">' + (result.error || 'Request failed') + '</p>';
+                    resultsEl.innerHTML = '<p class="text-red-600">' + (result.error || I18N.requestFailed) + '</p>';
                     return;
                 }
                 globalThis.lastAiSearchMatches = result.top_matches || [];
                 displayAiSearchResults(result);
             } catch (error) {
-                resultsEl.innerHTML = '<p class="text-red-600">Error: ' + error.message + '</p>';
+                resultsEl.innerHTML = '<p class="text-red-600">' + I18N.errorPrefix + ' ' + error.message + '</p>';
             }
         });
 
         function formatAiSearchParsedQuery(pq) {
             if (!pq) return '';
             const parts = [];
-            if (pq.origin_city) parts.push('From ' + pq.origin_city);
-            if (pq.destination_type) parts.push('Type: ' + pq.destination_type);
-            if (pq.max_price_eur) parts.push('Budget €' + pq.max_price_eur);
-            if (pq.max_duration_hours) parts.push('Up to ' + pq.max_duration_hours + 'h flight');
-            if (pq.weather_preference) parts.push('Weather: ' + pq.weather_preference);
-            return parts.length ? parts.join(' · ') : 'No filters extracted';
+            if (pq.origin_city) parts.push(I18N.from + ' ' + pq.origin_city);
+            if (pq.destination_type) parts.push(I18N.type + ': ' + pq.destination_type);
+            if (pq.max_price_eur) parts.push(I18N.budget + ' €' + pq.max_price_eur);
+            if (pq.max_duration_hours) parts.push(I18N.upTo + ' ' + pq.max_duration_hours + 'h flight');
+            if (pq.weather_preference) parts.push(I18N.weather + ': ' + pq.weather_preference);
+            return parts.length ? parts.join(' · ') : I18N.noFiltersExtracted;
         }
 
         function getAiSearchFlightMinutes(match) {
@@ -718,14 +786,14 @@
             const bookingUrl = 'https://www.google.com/search?q=' +
                 encodeURIComponent(bookingQueryParts.join(' ') + ' official site booking');
             return '<a href="' + bookingUrl + '" target="_blank" rel="noopener noreferrer" ' +
-                'class="text-sm text-blue-600 underline mt-2 inline-block">Search airline & booking options</a>';
+                'class="text-sm text-blue-600 underline mt-2 inline-block">' + I18N.searchAirlineBooking + '</a>';
         }
 
         function buildAiSearchSaveButton(idx, bookingLinkHtml) {
             return '<div class="flex flex-col items-start space-y-2 sm:items-end sm:space-y-0 sm:flex-row sm:space-x-3">' +
                 '<button onclick="saveTripFromAiSearch(' + idx + ')" ' +
                 'class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">' +
-                '<i class="fas fa-bookmark mr-1"></i>Save Trip</button>' +
+                '<i class="fas fa-bookmark mr-1"></i>' + I18N.saveTrip + '</button>' +
                 (bookingLinkHtml || '') +
                 '</div>';
         }
@@ -743,7 +811,7 @@
             const arr = flight.arrival_time ? new Date(flight.arrival_time).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '';
             const airlinePart = flight.flight_number ? ' ' + flight.flight_number : '';
             const airlineLine = flight.airline ? '<p class="text-sm text-gray-500">' + flight.airline + airlinePart + '</p>' : '';
-            const durationLine = hasDuration ? '<p>Duration: ' + timeStr + '</p>' : '';
+            const durationLine = hasDuration ? '<p>' + I18N.duration + ': ' + timeStr + '</p>' : '';
             const weatherLine = buildAiSearchWeatherLine(match.destination_weather);
             const originAirport = flight.origin_airport || {};
             const destAirport = flight.destination_airport || {};
@@ -755,21 +823,21 @@
 
         function buildAiSearchMatchCard(match, idx) {
             const p = getAiSearchMatchCardParts(match, idx);
-            const depLine = p.dep ? '<p>Dep: ' + p.dep + '</p>' : '';
-            const arrLine = p.arr ? '<p>Arr: ' + p.arr + '</p>' : '';
+            const depLine = p.dep ? '<p>' + I18N.dep + ' ' + p.dep + '</p>' : '';
+            const arrLine = p.arr ? '<p>' + I18N.arr + ' ' + p.arr + '</p>' : '';
             return '<div class="bg-white rounded-lg shadow-md p-6 card-hover">' +
                 '<div class="flex justify-between items-start mb-3">' +
-                '<div><h3 class="text-xl font-bold">Match ' + (idx + 1) + '</h3>' +
+                '<div><h3 class="text-xl font-bold">' + I18N.match + ' ' + (idx + 1) + '</h3>' +
                 '<p class="text-gray-600">' + p.origin + ' → ' + p.dest + '</p>' + (p.routeDetailLine || '') + p.airlineLine + '</div>' +
                 '<div class="text-right"><p class="text-2xl font-bold text-green-600">' + p.cost + '</p>' +
-                '<p class="text-sm text-gray-500">Match: ' + p.score + '%</p></div></div>' +
+                '<p class="text-sm text-gray-500">' + I18N.match + ': ' + p.score + '%</p></div></div>' +
                 '<div class="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3">' + p.durationLine + depLine + arrLine + p.weatherLine + '</div>' + p.saveBtn + '</div>';
         }
 
         function getAiSearchBackendLabel(llmBackend) {
-            if (llmBackend === 'ollama') return 'Parsed with Ollama';
-            if (llmBackend === 'groq') return 'Parsed with Groq';
-            return llmBackend ? 'Parsed with ' + llmBackend : '';
+            if (llmBackend === 'ollama') return I18N.parsedWithOllama;
+            if (llmBackend === 'groq') return I18N.parsedWithGroq;
+            return llmBackend ? (I18N.parsedWith + ' ' + llmBackend) : '';
         }
 
         function buildAiSearchSummaryHtml(data) {
@@ -778,13 +846,13 @@
             const confidence = hasConfidence ? (Number(data.ai_confidence) * 100).toFixed(0) + '%' : '';
             const summary = formatAiSearchParsedQuery(pq);
             const backendLabel = getAiSearchBackendLabel((data.llm_backend || '').toLowerCase());
-            const weatherLine = data.weather_configured ? '<p class="text-xs text-blue-600 mt-1"><i class="fas fa-cloud-sun mr-1"></i>Destination weather: on</p>' : '';
+            const weatherLine = data.weather_configured ? '<p class="text-xs text-blue-600 mt-1"><i class="fas fa-cloud-sun mr-1"></i>' + I18N.destinationWeatherOn + '</p>' : '';
             const hasContent = summary || confidence || backendLabel || data.weather_configured;
             if (hasContent) {
-                const confLine = confidence ? '<p class="text-xs text-gray-500 mt-2">AI confidence: ' + confidence + '</p>' : '';
+                const confLine = confidence ? '<p class="text-xs text-gray-500 mt-2">' + I18N.aiConfidence + ': ' + confidence + '</p>' : '';
                 const backendLine = backendLabel ? '<p class="text-xs text-gray-600 mt-1">' + backendLabel + '</p>' : '';
                 return '<div class="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">' +
-                    '<p class="font-medium text-gray-800">What we understood</p>' +
+                    '<p class="font-medium text-gray-800">' + I18N.whatWeUnderstood + '</p>' +
                     '<p class="text-gray-600 text-sm mt-1">' + summary + '</p>' + backendLine + confLine + weatherLine + '</div>';
             }
             return '';
@@ -795,7 +863,7 @@
             if (matches.length > 0) {
                 return matches.map((match, idx) => buildAiSearchMatchCard(match, idx)).join('');
             }
-            const msg = data.hint || 'No matches found. Try adjusting your query or add more flights to the database.';
+            const msg = data.hint || I18N.noMatchesHint;
             return '<p class="text-gray-600">' + msg + '</p>';
         }
 
@@ -817,14 +885,14 @@
                     <p class="text-sm text-gray-600">${result.message}</p>
                 `;
             } catch (error) {
-                alert('Error: ' + error.message);
+                alert(I18N.errorPrefix + ' ' + error.message);
             }
         });
 
         document.getElementById('linkPartnerBtn').addEventListener('click', async () => {
             const code = document.getElementById('partnerSyncCode').value;
             if (!code) {
-                alert('Please enter a sync code');
+                alert(I18N.enterSyncCode);
                 return;
             }
             
@@ -836,12 +904,12 @@
                 });
                 const result = await response.json();
                 if (result.success) {
-                    alert('Partner linked successfully!');
+                    alert(I18N.partnerLinked);
                 } else {
-                    alert('Error: ' + result.error);
+                    alert(I18N.errorPrefix + ' ' + result.error);
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                alert(I18N.errorPrefix + ' ' + error.message);
             }
         });
 
@@ -856,7 +924,7 @@
                 const result = await response.json();
                 displayDelayResults(result);
             } catch (error) {
-                alert('Error: ' + error.message);
+                alert(I18N.errorPrefix + ' ' + error.message);
             }
         });
 
@@ -875,13 +943,13 @@
             
             container.innerHTML = `
                 <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-xl font-bold mb-4">Delay Prediction</h3>
+                    <h3 class="text-xl font-bold mb-4">${I18N.delayPrediction}</h3>
                     <div class="space-y-2">
-                        <p><span class="font-semibold">Delay Probability:</span> 
+                        <p><span class="font-semibold">${I18N.delayProbability}</span> 
                             <span class="text-${riskColor}-600 font-bold">${pred.delay_probability.toFixed(1)}%</span>
                         </p>
-                        <p><span class="font-semibold">Average Delay:</span> ${pred.avg_delay_minutes} minutes</p>
-                        <p><span class="font-semibold">Sample Size:</span> ${pred.sample_size} flights</p>
+                        <p><span class="font-semibold">${I18N.averageDelay}</span> ${pred.avg_delay_minutes} ${I18N.minutes}</p>
+                        <p><span class="font-semibold">${I18N.sampleSize}</span> ${pred.sample_size} ${I18N.flights}</p>
                     </div>
                 </div>
             `;

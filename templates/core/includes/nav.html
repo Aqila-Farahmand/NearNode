@@ -1,4 +1,4 @@
-{% load static %}
+{% load static i18n %}
 <style>
     .nearnode-nav {
         background: linear-gradient(135deg, #34A8EB 0%, #1e6bb8 50%, #0f4c81 100%);
@@ -21,23 +21,34 @@
 
             <div class="flex items-center gap-1 sm:gap-4">
                 <a href="{% url 'home' %}" class="nav-link px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-                    <i class="fas fa-home mr-1.5 hidden sm:inline" aria-hidden="true"></i>Home
+                    <i class="fas fa-home mr-1.5 hidden sm:inline" aria-hidden="true"></i>{% trans "Home" %}
                 </a>
                 {% if user.is_authenticated %}
                     <a href="{% url 'profile' %}" class="nav-link px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-                        <i class="fas fa-user mr-1.5 hidden sm:inline" aria-hidden="true"></i>Profile
+                        <i class="fas fa-user mr-1.5 hidden sm:inline" aria-hidden="true"></i>{% trans "Profile" %}
                     </a>
                     <a href="{% url 'logout' %}" class="nav-link px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-                        <i class="fas fa-sign-out-alt mr-1.5" aria-hidden="true"></i>Logout
+                        <i class="fas fa-sign-out-alt mr-1.5" aria-hidden="true"></i>{% trans "Logout" %}
                     </a>
                 {% else %}
                     <a href="{% url 'login' %}" class="nav-link px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-                        <i class="fas fa-sign-in-alt mr-1.5" aria-hidden="true"></i>Login
+                        <i class="fas fa-sign-in-alt mr-1.5" aria-hidden="true"></i>{% trans "Login" %}
                     </a>
                     <a href="{% url 'signup' %}" class="nav-link px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
-                        <i class="fas fa-user-plus mr-1.5" aria-hidden="true"></i>Sign up
+                        <i class="fas fa-user-plus mr-1.5" aria-hidden="true"></i>{% trans "Sign up" %}
                     </a>
                 {% endif %}
+                <form method="post" action="{% url 'set_language_preference' %}" class="ml-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <select name="language" onchange="this.form.submit()" class="text-xs rounded px-2 py-1 text-gray-800 bg-white">
+                        {% get_current_language as CURRENT_LANGUAGE %}
+                        {% get_available_languages as AVAILABLE_LANGUAGES %}
+                        {% for code, name in AVAILABLE_LANGUAGES %}
+                            <option value="{{ code }}" {% if code == CURRENT_LANGUAGE %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
             </div>
         </div>
     </div>

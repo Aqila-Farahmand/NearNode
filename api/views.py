@@ -112,6 +112,30 @@ def _fetch_weather_for_city(city_name):
         return None
 
 
+def _exchange_rates_to_eur():
+    # Approximate display rates; replace with live FX in production.
+    return {
+        'EUR': 1.0,
+        'USD': 1.10,
+        'GBP': 0.85,
+        'JPY': 160.0,
+        'CAD': 1.50,
+        'AUD': 1.65,
+        'CHF': 0.95,
+        'CNY': 7.80,
+        'INR': 90.0,
+        'AED': 4.05,
+        'BRL': 6.0,
+        'MXN': 20.0,
+        'SGD': 1.47,
+        'HKD': 8.6,
+        'SEK': 11.0,
+        'NOK': 11.5,
+        'DKK': 7.5,
+        'NZD': 1.8,
+    }
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def nearest_airport(request):
@@ -253,10 +277,7 @@ def nearest_alternate_search(request):
             pass
 
     # Convert prices to user's currency (simplified - in production, use real exchange rates)
-    exchange_rates = {
-        'USD': 1.10, 'EUR': 1.0, 'GBP': 0.85, 'JPY': 160.0,
-        'CAD': 1.50, 'AUD': 1.65, 'CHF': 0.95, 'CNY': 7.80
-    }
+    exchange_rates = _exchange_rates_to_eur()
     rate = exchange_rates.get(currency, 1.0)
 
     use_real_api = amadeus_client.is_configured()
@@ -708,11 +729,17 @@ def update_user_profile(request):
 
     budget = request.data.get('budget_preference_eur')
     preferred_airlines = request.data.get('preferred_airlines')
+    currency = request.data.get('currency')
+    preferred_language = request.data.get('preferred_language')
 
     if budget is not None:
         profile.budget_preference_eur = budget
     if preferred_airlines is not None:
         profile.preferred_airlines = preferred_airlines
+    if currency is not None:
+        profile.currency = currency
+    if preferred_language is not None:
+        profile.preferred_language = preferred_language
 
     profile.save()
 

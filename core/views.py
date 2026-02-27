@@ -9,6 +9,8 @@ from core.models import UserProfile, Airport, TripOption, Flight, FlightConnecti
 from core.countries import COUNTRY_CHOICES
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
+from django.utils import translation
+from django.utils.translation import gettext as _
 from django.conf import settings
 from decimal import Decimal
 import json
@@ -18,7 +20,30 @@ import requests
 @login_required
 def home_view(request):
     """Main app view – requires login. Unauthenticated users are redirected to login/signup."""
-    return render(request, 'core/index.html')
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    return render(request, 'core/index.html', {'ui_language': profile.preferred_language or 'en'})
+
+
+@require_http_methods(["POST"])
+def set_language_preference(request):
+    """Set UI language (cookie/session + optional user profile persistence)."""
+    requested = (request.POST.get('language') or '').strip()
+    allowed = {code for code, _name in getattr(settings, 'LANGUAGES', [])}
+    lang = requested if requested in allowed else settings.LANGUAGE_CODE
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or '/'
+    response = redirect(next_url)
+    response.set_cookie(settings.LANGUAGE_COOKIE_NAME, lang)
+    if hasattr(request, 'session'):
+        # Django no longer exposes LANGUAGE_SESSION_KEY in some versions.
+        # LocaleMiddleware still honors the default session key name.
+        request.session[settings.LANGUAGE_COOKIE_NAME] = lang
+    translation.activate(lang)
+    if request.user.is_authenticated:
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        if profile.preferred_language != lang:
+            profile.preferred_language = lang
+            profile.save(update_fields=['preferred_language'])
+    return response
 
 
 def _populate_user_profile(user, profile, post_data):
@@ -51,10 +76,10 @@ def signup_view(request):
             profile = UserProfile.objects.create(user=user)
             _populate_user_profile(user, profile, request.POST)
             login(request, user)
-            messages.success(request, 'Account created successfully!')
+            messages.success(request, _('Account created successfully!'))
             return redirect('profile')
         else:
-            messages.error(request, 'Please correct the errors below.')
+            messages.error(request, _('Please correct the errors below.'))
     else:
         form = UserCreationForm()
 
@@ -76,14 +101,14 @@ def login_view(request):
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
-                messages.success(request, f'Welcome back, {user.username}!')
+                messages.success(request, _('Welcome back, %(username)s!') % {'username': user.username})
                 next_url = request.POST.get('next') or request.GET.get('next') or 'home'
                 return redirect(next_url)
             else:
-                messages.error(request, 'Invalid username or password.')
+                messages.error(request, _('Invalid username or password.'))
         else:
             messages.error(
-                request, 'Please provide both username and password.')
+                request, _('Please provide both username and password.'))
 
     return render(request, 'core/login.html')
 
@@ -92,7 +117,7 @@ def login_view(request):
 def logout_view(request):
     """User logout view"""
     logout(request)
-    messages.success(request, 'You have been logged out successfully.')
+    messages.success(request, _('You have been logged out successfully.'))
     return redirect('home')
 
 
@@ -109,12 +134,16 @@ def _initialize_new_profile(profile, user):
 
 def _update_profile_from_post(profile, user, post_data, request_obj):
     """Helper function to update profile from POST data"""
+    allowed_languages = {code for code, _name in getattr(settings, 'LANGUAGES', [])}
+
     # Update basic profile fields
     profile.first_name = post_data.get('first_name', '')
     profile.last_name = post_data.get('last_name', '')
     profile.email = post_data.get('email', '')
     profile.phone_number = post_data.get('phone_number', '')
     profile.currency = post_data.get('currency', 'EUR')
+    requested_language = post_data.get('preferred_language', settings.LANGUAGE_CODE)
+    profile.preferred_language = requested_language if requested_language in allowed_languages else settings.LANGUAGE_CODE
     raw = (post_data.get('country_code') or '').strip().upper()
     profile.country_code = raw[:2] if len(raw) >= 2 else ''
 
@@ -130,7 +159,7 @@ def _update_profile_from_post(profile, user, post_data, request_obj):
             airport = Airport.objects.get(iata_code=airport_code)
             profile.home_airport = airport
         except Airport.DoesNotExist:
-            messages.error(request_obj, 'Invalid airport code.')
+            messages.error(request_obj, _('Invalid airport code.'))
 
     # Update location
     lat = post_data.get('latitude')
@@ -156,7 +185,7 @@ def profile_view(request):
 
     if request.method == 'POST':
         _update_profile_from_post(profile, request.user, request.POST, request)
-        messages.success(request, 'Profile updated successfully!')
+        messages.success(request, _('Profile updated successfully!'))
         return redirect('profile')
 
     # Get saved trips
@@ -176,6 +205,9 @@ def profile_view(request):
         'saved_trips': saved_trips,
         'airports': airports,
         'country_choices': COUNTRY_CHOICES,
+        'currency_choices': UserProfile.CURRENCY_CHOICES,
+        'language_choices': getattr(settings, 'LANGUAGES', UserProfile.LANGUAGE_CHOICES),
+        'ui_language': profile.preferred_language or 'en',
     }
     return render(request, 'core/profile.html', context)
 

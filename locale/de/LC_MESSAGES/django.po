@@ -1,0 +1,950 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: nearnode\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-02-27 13:19+0100\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: core/views.py:79
+msgid "Account created successfully!"
+msgstr "Konto erfolgreich erstellt!"
+
+#: core/views.py:82
+msgid "Please correct the errors below."
+msgstr "Bitte korrigieren Sie die unten stehenden Fehler."
+
+#: core/views.py:104
+#, python-format
+msgid "Welcome back, %(username)s!"
+msgstr "Willkommen zurück, %(username)s!"
+
+#: core/views.py:108
+msgid "Invalid username or password."
+msgstr "Ungültiger Benutzername oder Passwort."
+
+#: core/views.py:111
+msgid "Please provide both username and password."
+msgstr "Bitte Benutzername und Passwort eingeben."
+
+#: core/views.py:120
+msgid "You have been logged out successfully."
+msgstr "Sie wurden erfolgreich abgemeldet."
+
+#: core/views.py:159
+msgid "Invalid airport code."
+msgstr "Ungültiger Flughafencode."
+
+#: core/views.py:185
+msgid "Profile updated successfully!"
+msgstr "Profil erfolgreich aktualisiert!"
+
+#: templates/allauth/socialaccount/connections.html:7
+#, fuzzy
+#| msgid "Delete Account"
+msgid "Account Connections - NearNode"
+msgstr "Konto löschen"
+
+#: templates/allauth/socialaccount/connections.html:25
+#, fuzzy
+#| msgid "Find Connections"
+msgid "Account Connections"
+msgstr "Verbindungen finden"
+
+#: templates/allauth/socialaccount/connections.html:42
+msgid ""
+"You can sign in to your account using any of the following third party "
+"accounts:"
+msgstr ""
+
+#: templates/allauth/socialaccount/connections.html:65
+msgid "Use this"
+msgstr ""
+
+#: templates/allauth/socialaccount/connections.html:73
+#, fuzzy
+#| msgid "Delete Account"
+msgid "Use Selected Account"
+msgstr "Konto löschen"
+
+#: templates/allauth/socialaccount/connections.html:79
+msgid ""
+"You currently have no social network accounts connected to this account."
+msgstr ""
+
+#: templates/allauth/socialaccount/connections.html:83
+msgid "Add a Third Party Account"
+msgstr ""
+
+#: templates/allauth/socialaccount/connections.html:93
+#: templates/allauth/socialaccount/login.html:102
+msgid "Back to Home"
+msgstr ""
+
+#: templates/allauth/socialaccount/login.html:7
+#, fuzzy
+#| msgid "Sign in with Google"
+msgid "Sign in with Google - NearNode"
+msgstr "Mit Google anmelden"
+
+#: templates/allauth/socialaccount/login.html:37
+#: templates/allauth/socialaccount/login.html:82 templates/core/login.html:78
+msgid "Sign in with Google"
+msgstr "Mit Google anmelden"
+
+#: templates/allauth/socialaccount/login.html:38
+msgid "Redirecting to Google..."
+msgstr ""
+
+#: templates/allauth/socialaccount/login.html:47
+#, fuzzy
+#| msgid "Sign in with Google"
+msgid "Connecting to Google"
+msgstr "Mit Google anmelden"
+
+#: templates/allauth/socialaccount/login.html:49
+msgid "You will be redirected to Google to complete sign in"
+msgstr ""
+
+#: templates/allauth/socialaccount/login.html:90
+msgid "If you are not redirected automatically:"
+msgstr ""
+
+#: templates/allauth/socialaccount/login.html:96
+#, fuzzy
+#| msgid "Sign in with Google"
+msgid "Continue to Google"
+msgstr "Mit Google anmelden"
+
+#: templates/allauth/socialaccount/snippets/provider_list.html:34
+#, fuzzy, python-format
+#| msgid "Sign in with Google"
+msgid "Sign in with %(provider_name)s"
+msgstr "Mit Google anmelden"
+
+#: templates/core/delete_account.html:7
+#, fuzzy
+#| msgid "Delete Account"
+msgid "Delete Account - NearNode"
+msgstr "Konto löschen"
+
+#: templates/core/delete_account.html:26
+msgid "Warning: This action cannot be undone"
+msgstr ""
+
+#: templates/core/delete_account.html:28
+msgid "Deleting your account will permanently remove:"
+msgstr ""
+
+#: templates/core/delete_account.html:31
+#, fuzzy
+#| msgid "Profile Information"
+msgid "Your profile and personal information"
+msgstr "Profilinformationen"
+
+#: templates/core/delete_account.html:32
+#, fuzzy
+#| msgid "No saved trips yet"
+msgid "All saved trips"
+msgstr "Noch keine gespeicherten Reisen"
+
+#: templates/core/delete_account.html:33
+msgid "Your search history"
+msgstr ""
+
+#: templates/core/delete_account.html:34
+#, fuzzy
+#| msgid "Collaborative"
+msgid "Collaborative trip matches"
+msgstr "Kollaborativ"
+
+#: templates/core/delete_account.html:35
+msgid "All other account data"
+msgstr ""
+
+#: templates/core/delete_account.html:55
+msgid "Delete My Account"
+msgstr "Mein Konto löschen"
+
+#: templates/core/delete_account.html:64
+msgid "Enter your password to confirm"
+msgstr "Geben Sie zur Bestätigung Ihr Passwort ein"
+
+#: templates/core/delete_account.html:68
+msgid "Your password"
+msgstr "Ihr Passwort"
+
+#: templates/core/delete_account.html:73 templates/core/index.html:245
+msgid "Type"
+msgstr "Geben Sie"
+
+#: templates/core/delete_account.html:73
+msgid "to confirm"
+msgstr "zur Bestätigung ein"
+
+#: templates/core/delete_account.html:77
+msgid "Type DELETE"
+msgstr "Geben Sie DELETE ein"
+
+#: templates/core/delete_account.html:79
+msgid "This confirms you understand this action is permanent"
+msgstr "Dies bestätigt, dass Sie verstehen, dass diese Aktion dauerhaft ist"
+
+#: templates/core/delete_account.html:87
+#, fuzzy
+#| msgid "Delete Account"
+msgid "Permanently Delete Account"
+msgstr "Konto löschen"
+
+#: templates/core/delete_account.html:91
+msgid "Cancel"
+msgstr "Abbrechen"
+
+#: templates/core/delete_account.html:101
+msgid "Note:"
+msgstr "Hinweis:"
+
+#: templates/core/delete_account.html:101
+msgid ""
+"If you're having issues with your account, consider contacting support "
+"before deleting."
+msgstr ""
+"Wenn Sie Probleme mit Ihrem Konto haben, kontaktieren Sie bitte den Support, "
+"bevor Sie es löschen."
+
+#: templates/core/delete_account.html:102
+msgid "Once deleted, we cannot recover your data."
+msgstr "Nach dem Löschen können wir Ihre Daten nicht wiederherstellen."
+
+#: templates/core/delete_account.html:114
+msgid "Please type \\\"DELETE\\\" in the confirmation field to proceed."
+msgstr ""
+"Bitte geben Sie \\\"DELETE\\\" in das Bestätigungsfeld ein, um fortzufahren."
+
+#: templates/core/delete_account.html:118
+msgid ""
+"Are you absolutely sure you want to delete your account? This cannot be "
+"undone!"
+msgstr ""
+"Sind Sie absolut sicher, dass Sie Ihr Konto löschen möchten? Dies kann nicht "
+"rückgängig gemacht werden!"
+
+#: templates/core/includes/nav.html:24
+msgid "Home"
+msgstr "Startseite"
+
+#: templates/core/includes/nav.html:28
+msgid "Profile"
+msgstr "Profil"
+
+#: templates/core/includes/nav.html:31
+msgid "Logout"
+msgstr "Abmelden"
+
+#: templates/core/includes/nav.html:35
+msgid "Login"
+msgstr "Anmelden"
+
+#: templates/core/includes/nav.html:38
+msgid "Sign up"
+msgstr "Registrieren"
+
+#: templates/core/index.html:7
+msgid "NearNode - Smart Travel Planning"
+msgstr "NearNode - Intelligente Reiseplanung"
+
+#: templates/core/index.html:43
+msgid "Nearest Alternate"
+msgstr "Nächste Alternative"
+
+#: templates/core/index.html:46
+msgid "Multi-Modal"
+msgstr "Multimodal"
+
+#: templates/core/index.html:49 templates/core/index.html:152
+msgid "AI Search"
+msgstr "KI-Suche"
+
+#: templates/core/index.html:52
+msgid "Collaborative"
+msgstr "Kollaborativ"
+
+#: templates/core/index.html:55
+msgid "Delay Protection"
+msgstr "Verspätungsschutz"
+
+#: templates/core/index.html:63
+msgid "Nearest Alternate Optimization"
+msgstr "Optimierung naher Alternativen"
+
+#: templates/core/index.html:64
+msgid "Find cheaper flights to nearby airports and calculate total trip cost"
+msgstr ""
+"Finde günstigere Flüge zu nahegelegenen Flughäfen und berechne die "
+"Gesamtreisekosten"
+
+#: templates/core/index.html:69
+msgid "Your Origin (city/address/airport)"
+msgstr "Ihr Startpunkt (Stadt/Adresse/Flughafen)"
+
+#: templates/core/index.html:70
+msgid "e.g., Luxembourg or LUX"
+msgstr ""
+
+#: templates/core/index.html:74
+msgid "Destination (country/city/airport)"
+msgstr "Ziel (Land/Stadt/Flughafen)"
+
+#: templates/core/index.html:75
+msgid "e.g., Croatia or ZAG"
+msgstr ""
+
+#: templates/core/index.html:79 templates/core/index.html:136
+msgid "Date"
+msgstr "Datum"
+
+#: templates/core/index.html:84
+msgid "Origin Radius (km)"
+msgstr "Start-Radius (km)"
+
+#: templates/core/index.html:89
+msgid "Sort By"
+msgstr "Sortieren nach"
+
+#: templates/core/index.html:91 templates/core/index.html:224
+msgid "Total Cost"
+msgstr "Gesamtkosten"
+
+#: templates/core/index.html:92
+msgid "Total Duration"
+msgstr "Gesamtdauer"
+
+#: templates/core/index.html:93
+msgid "Distance from Origin"
+msgstr "Entfernung vom Start"
+
+#: templates/core/index.html:97
+msgid "Sort Order"
+msgstr "Sortierreihenfolge"
+
+#: templates/core/index.html:99
+msgid "Ascending"
+msgstr "Aufsteigend"
+
+#: templates/core/index.html:100
+msgid "Descending"
+msgstr "Absteigend"
+
+#: templates/core/index.html:104
+msgid "Max Results"
+msgstr "Max. Ergebnisse"
+
+#: templates/core/index.html:110
+msgid "Search"
+msgstr "Suchen"
+
+#: templates/core/index.html:120
+msgid "Multi-Modal Connection Logic"
+msgstr "Multimodale Verbindungslogik"
+
+#: templates/core/index.html:121
+msgid "Find connections with train links and layover quality scores"
+msgstr "Finde Verbindungen mit Zugstrecken und Umstiegs-Qualitätsbewertung"
+
+#: templates/core/index.html:126
+msgid "Origin Airport"
+msgstr "Abflughafen"
+
+#: templates/core/index.html:127
+msgid "e.g., BRU"
+msgstr "z. B. BRU"
+
+#: templates/core/index.html:131
+msgid "Destination Airport"
+msgstr "Zielflughafen"
+
+#: templates/core/index.html:132
+msgid "e.g., AMS"
+msgstr "z. B. AMS"
+
+#: templates/core/index.html:142
+msgid "Find Connections"
+msgstr "Verbindungen finden"
+
+#: templates/core/index.html:153
+msgid ""
+"Write your trip in plain text — e.g. origin, destination type, budget, or "
+"dates."
+msgstr ""
+"Beschreibe deine Reise in Freitext — z. B. Start, Zieltyp, Budget oder Daten."
+
+#: templates/core/index.html:157
+msgid "Describe your trip (free text)"
+msgstr "Beschreibe deine Reise (Freitext)"
+
+#: templates/core/index.html:158
+msgid "e.g., From Milan I want a warm beach under €300, max 5 hours flight"
+msgstr ""
+"z. B. Von Mailand möchte ich einen warmen Strand unter 300 €, max. 5h Flug"
+
+#: templates/core/index.html:172
+msgid "Collaborative Trip Planning"
+msgstr "Kollaborative Reiseplanung"
+
+#: templates/core/index.html:173
+msgid "Plan trips together with your partner"
+msgstr "Plane Reisen gemeinsam mit deinem Partner"
+
+#: templates/core/index.html:177
+msgid "Step 1: Generate Sync Code"
+msgstr "Schritt 1: Sync-Code erstellen"
+
+#: templates/core/index.html:179
+msgid "Generate Code"
+msgstr "Code erstellen"
+
+#: templates/core/index.html:185
+msgid "Step 2: Link Partner"
+msgstr "Schritt 2: Partner verknüpfen"
+
+#: templates/core/index.html:187
+msgid "Enter partner code"
+msgstr "Partner-Code eingeben"
+
+#: templates/core/index.html:190
+msgid "Link"
+msgstr "Verknüpfen"
+
+#: templates/core/index.html:202
+msgid "Delay Prediction & Self-Transfer Insurance"
+msgstr "Verspätungsprognose & Selbsttransfer-Versicherung"
+
+#: templates/core/index.html:203
+msgid "Check delay probability and self-transfer safety"
+msgstr "Prüfe Verspätungswahrscheinlichkeit und Sicherheit des Selbsttransfers"
+
+#: templates/core/index.html:207
+msgid "Flight ID"
+msgstr "Flug-ID"
+
+#: templates/core/index.html:208
+msgid "Enter flight ID"
+msgstr "Flug-ID eingeben"
+
+#: templates/core/index.html:212
+msgid "Check Delay Risk"
+msgstr "Verspätungsrisiko prüfen"
+
+#: templates/core/index.html:223
+msgid "Option"
+msgstr "Option"
+
+#: templates/core/index.html:225
+msgid "Flight Cost"
+msgstr "Flugkosten"
+
+#: templates/core/index.html:226
+msgid "Ground Transport"
+msgstr "Bodentransport"
+
+#: templates/core/index.html:227
+msgid "Total Time"
+msgstr "Gesamtzeit"
+
+#: templates/core/index.html:228 templates/core/profile.html:223
+msgid "Ground:"
+msgstr ""
+
+#: templates/core/index.html:229 templates/core/profile.html:198
+#, fuzzy
+#| msgid "Flight ID"
+msgid "Flight:"
+msgstr "Flug-ID"
+
+#: templates/core/index.html:230
+#, fuzzy
+#| msgid "Saved Trips"
+msgid "Save Trip"
+msgstr "Gespeicherte Reisen"
+
+#: templates/core/index.html:231
+#, fuzzy
+#| msgid "No saved trips yet"
+msgid "Please login to save trips"
+msgstr "Noch keine gespeicherten Reisen"
+
+#: templates/core/index.html:232
+msgid "Trip saved successfully! View it in your profile."
+msgstr ""
+
+#: templates/core/index.html:233
+#, fuzzy
+#| msgid "No saved trips yet"
+msgid "Failed to save trip"
+msgstr "Noch keine gespeicherten Reisen"
+
+#: templates/core/index.html:234 templates/core/profile.html:257
+msgid "Error:"
+msgstr ""
+
+#: templates/core/index.html:235
+#, fuzzy
+#| msgid "Searching flights..."
+msgid "Searching connections..."
+msgstr "Flüge werden gesucht..."
+
+#: templates/core/index.html:236
+msgid "Direct"
+msgstr ""
+
+#: templates/core/index.html:237
+msgid "Train Link"
+msgstr ""
+
+#: templates/core/index.html:238 templates/core/profile.html:217
+#, fuzzy
+#| msgid "Find Connections"
+msgid "Connection"
+msgstr "Verbindungen finden"
+
+#: templates/core/index.html:239
+msgid "Quality Score"
+msgstr ""
+
+#: templates/core/index.html:240
+#, fuzzy
+#| msgid "No results found."
+msgid "No connections found"
+msgstr "Keine Ergebnisse gefunden."
+
+#: templates/core/index.html:241
+#, fuzzy
+#| msgid "Searching flights..."
+msgid "Searching..."
+msgstr "Flüge werden gesucht..."
+
+#: templates/core/index.html:242
+msgid "Request failed"
+msgstr ""
+
+#: templates/core/index.html:243
+msgid "log in and try again"
+msgstr ""
+
+#: templates/core/index.html:244
+msgid "From"
+msgstr ""
+
+#: templates/core/index.html:246
+msgid "Budget"
+msgstr ""
+
+#: templates/core/index.html:247
+msgid "Up to"
+msgstr ""
+
+#: templates/core/index.html:248
+msgid "Weather"
+msgstr ""
+
+#: templates/core/index.html:249
+msgid "No filters extracted"
+msgstr ""
+
+#: templates/core/index.html:250
+#, fuzzy
+#| msgid "Total Duration"
+msgid "Duration"
+msgstr "Gesamtdauer"
+
+#: templates/core/index.html:251 templates/core/profile.html:196
+#: templates/core/profile.html:214
+msgid "Dep:"
+msgstr ""
+
+#: templates/core/index.html:252 templates/core/profile.html:197
+#: templates/core/profile.html:214
+msgid "Arr:"
+msgstr ""
+
+#: templates/core/index.html:253
+msgid "Match"
+msgstr ""
+
+#: templates/core/index.html:254
+msgid "Parsed with Ollama"
+msgstr ""
+
+#: templates/core/index.html:255
+msgid "Parsed with Groq"
+msgstr ""
+
+#: templates/core/index.html:256
+msgid "Parsed with"
+msgstr ""
+
+#: templates/core/index.html:257
+#, fuzzy
+#| msgid "Destination Airport"
+msgid "Destination weather: on"
+msgstr "Zielflughafen"
+
+#: templates/core/index.html:258
+msgid "AI confidence"
+msgstr ""
+
+#: templates/core/index.html:259
+msgid "What we understood"
+msgstr ""
+
+#: templates/core/index.html:260
+msgid ""
+"No matches found. Try adjusting your query or add more flights to the "
+"database."
+msgstr ""
+
+#: templates/core/index.html:261
+#, fuzzy
+#| msgid "Step 1: Generate Sync Code"
+msgid "Please enter a sync code"
+msgstr "Schritt 1: Sync-Code erstellen"
+
+#: templates/core/index.html:262
+#, fuzzy
+#| msgid "Profile updated successfully!"
+msgid "Partner linked successfully!"
+msgstr "Profil erfolgreich aktualisiert!"
+
+#: templates/core/index.html:263
+#, fuzzy
+#| msgid "Delay Protection"
+msgid "Delay Prediction"
+msgstr "Verspätungsschutz"
+
+#: templates/core/index.html:264
+msgid "Delay Probability:"
+msgstr ""
+
+#: templates/core/index.html:265
+msgid "Average Delay:"
+msgstr ""
+
+#: templates/core/index.html:266
+msgid "Sample Size:"
+msgstr ""
+
+#: templates/core/index.html:267
+msgid "minutes"
+msgstr ""
+
+#: templates/core/index.html:268
+#, fuzzy
+#| msgid "Flight Cost"
+msgid "flights"
+msgstr "Flugkosten"
+
+#: templates/core/index.html:269
+msgid "Search airline & booking options"
+msgstr ""
+
+#: templates/core/index.html:270
+msgid "No results found."
+msgstr "Keine Ergebnisse gefunden."
+
+#: templates/core/index.html:271
+msgid "from your location"
+msgstr "von Ihrem Standort"
+
+#: templates/core/index.html:272
+msgid "from destination center"
+msgstr "vom Zielzentrum"
+
+#: templates/core/index.html:273
+msgid "Searching flights..."
+msgstr "Flüge werden gesucht..."
+
+#: templates/core/index.html:274
+msgid "Checked origins:"
+msgstr "Geprüfte Startorte:"
+
+#: templates/core/index.html:275
+msgid "Checked destinations:"
+msgstr "Geprüfte Ziele:"
+
+#: templates/core/index.html:276
+msgid "API sort:"
+msgstr "API-Sortierung:"
+
+#: templates/core/index.html:499
+msgid "Sort results:"
+msgstr "Ergebnisse sortieren:"
+
+#: templates/core/index.html:500
+msgid "Best"
+msgstr "Beste"
+
+#: templates/core/index.html:501
+msgid "Cheapest"
+msgstr "Günstigste"
+
+#: templates/core/index.html:502
+msgid "Quickest"
+msgstr "Schnellste"
+
+#: templates/core/index.html:503
+msgid "Nearest Airport"
+msgstr "Nächster Flughafen"
+
+#: templates/core/login.html:7
+msgid "Login - NearNode"
+msgstr "Anmeldung - NearNode"
+
+#: templates/core/login.html:21
+msgid "Sign in to your account"
+msgstr "Melde dich bei deinem Konto an"
+
+#: templates/core/login.html:44 templates/core/signup.html:59
+msgid "Username"
+msgstr "Benutzername"
+
+#: templates/core/login.html:48
+msgid "Enter your username"
+msgstr "Benutzernamen eingeben"
+
+#: templates/core/login.html:52 templates/core/signup.html:90
+msgid "Password"
+msgstr "Passwort"
+
+#: templates/core/login.html:56
+msgid "Enter your password"
+msgstr "Passwort eingeben"
+
+#: templates/core/login.html:62
+msgid "Sign In"
+msgstr "Anmelden"
+
+#: templates/core/login.html:72 templates/core/signup.html:130
+msgid "Or continue with"
+msgstr "Oder fortfahren mit"
+
+#: templates/core/login.html:81
+msgid "Don't have an account?"
+msgstr "Du hast noch kein Konto?"
+
+#: templates/core/login.html:83
+msgid "Sign up here"
+msgstr "Hier registrieren"
+
+#: templates/core/profile.html:7
+msgid "My Profile - NearNode"
+msgstr "Mein Profil - NearNode"
+
+#: templates/core/profile.html:36
+msgid "Profile Information"
+msgstr "Profilinformationen"
+
+#: templates/core/profile.html:44 templates/core/signup.html:42
+msgid "First Name"
+msgstr "Vorname"
+
+#: templates/core/profile.html:52 templates/core/signup.html:50
+msgid "Last Name"
+msgstr "Nachname"
+
+#: templates/core/profile.html:60 templates/core/signup.html:74
+msgid "Email"
+msgstr "E-Mail"
+
+#: templates/core/profile.html:68 templates/core/signup.html:82
+msgid "Phone Number"
+msgstr "Telefonnummer"
+
+#: templates/core/profile.html:76
+msgid "Country"
+msgstr "Land"
+
+#: templates/core/profile.html:80
+msgid "Select country"
+msgstr "Land wählen"
+
+#: templates/core/profile.html:88
+msgid "Preferred Currency"
+msgstr "Bevorzugte Währung"
+
+#: templates/core/profile.html:99
+msgid "Preferred Language"
+msgstr "Bevorzugte Sprache"
+
+#: templates/core/profile.html:110
+msgid "Home Airport"
+msgstr "Heimatflughafen"
+
+#: templates/core/profile.html:112
+msgid "Search by city, name or code (e.g. London, LHR)"
+msgstr "Nach Stadt, Name oder Code suchen (z. B. London, LHR)"
+
+#: templates/core/profile.html:117
+msgid "Select Airport"
+msgstr "Flughafen wählen"
+
+#: templates/core/profile.html:134 templates/core/profile.html:254
+msgid "Use Current Location"
+msgstr "Aktuellen Standort verwenden"
+
+#: templates/core/profile.html:138
+msgid "Save Profile"
+msgstr "Profil speichern"
+
+#: templates/core/profile.html:143
+msgid "Delete Account"
+msgstr "Konto löschen"
+
+#: templates/core/profile.html:157
+msgid "Saved Trips"
+msgstr "Gespeicherte Reisen"
+
+#: templates/core/profile.html:174
+msgid "Remove from saved"
+msgstr ""
+
+#: templates/core/profile.html:179
+#, fuzzy
+#| msgid "Saved Trips"
+msgid "Saved"
+msgstr "Gespeicherte Reisen"
+
+#: templates/core/profile.html:190 templates/core/profile.html:211
+#, fuzzy
+#| msgid "Flight ID"
+msgid "Flight"
+msgstr "Flug-ID"
+
+#: templates/core/profile.html:201
+#, fuzzy
+#| msgid "Select Airport"
+msgid "Alternate airport"
+msgstr "Flughafen wählen"
+
+#: templates/core/profile.html:203
+#, fuzzy
+#| msgid "Checked destinations:"
+msgid "km to destination"
+msgstr "Geprüfte Ziele:"
+
+#: templates/core/profile.html:206
+msgid "Ground"
+msgstr ""
+
+#: templates/core/profile.html:229 templates/core/profile.html:259
+msgid "View flight details"
+msgstr ""
+
+#: templates/core/profile.html:237
+msgid "No saved trips yet"
+msgstr "Noch keine gespeicherten Reisen"
+
+#: templates/core/profile.html:247
+msgid "Geolocation is not supported by your browser."
+msgstr ""
+
+#: templates/core/profile.html:248
+msgid "Getting location..."
+msgstr ""
+
+#: templates/core/profile.html:249
+#, fuzzy
+#| msgid "Nearest Airport"
+msgid "Nearest airport set to"
+msgstr "Nächster Flughafen"
+
+#: templates/core/profile.html:250
+msgid "km away"
+msgstr ""
+
+#: templates/core/profile.html:251
+msgid "Click \\\"Save Profile\\\" to update."
+msgstr ""
+
+#: templates/core/profile.html:252
+msgid "Location saved. No airport found in database."
+msgstr ""
+
+#: templates/core/profile.html:253
+msgid "Location saved. Could not fetch nearest airport."
+msgstr ""
+
+#: templates/core/profile.html:255
+msgid ""
+"Unable to get your location. Please allow location access or enter it "
+"manually."
+msgstr ""
+
+#: templates/core/profile.html:256
+msgid "Remove this trip from saved trips?"
+msgstr ""
+
+#: templates/core/profile.html:258
+msgid "Hide flight details"
+msgstr ""
+
+#: templates/core/signup.html:7
+msgid "Sign Up - NearNode"
+msgstr "Registrierung - NearNode"
+
+#: templates/core/signup.html:21
+msgid "Create your account"
+msgstr "Erstelle dein Konto"
+
+#: templates/core/signup.html:46
+#, fuzzy
+#| msgid "First Name"
+msgid "First name"
+msgstr "Vorname"
+
+#: templates/core/signup.html:54
+#, fuzzy
+#| msgid "Last Name"
+msgid "Last name"
+msgstr "Nachname"
+
+#: templates/core/signup.html:63
+msgid "Choose a username"
+msgstr "Benutzernamen wählen"
+
+#: templates/core/signup.html:78
+msgid "your.email@example.com"
+msgstr ""
+
+#: templates/core/signup.html:86
+msgid "+1 234 567 8900"
+msgstr ""
+
+#: templates/core/signup.html:94
+msgid "Create a password"
+msgstr "Passwort erstellen"
+
+#: templates/core/signup.html:104
+msgid "Confirm Password"
+msgstr "Passwort bestätigen"
+
+#: templates/core/signup.html:108
+msgid "Confirm your password"
+msgstr "Bestätige dein Passwort"
+
+#: templates/core/signup.html:120
+msgid "Create Account"
+msgstr "Konto erstellen"
+
+#: templates/core/signup.html:136
+msgid "Sign up with Google"
+msgstr "Mit Google registrieren"
+
+#: templates/core/signup.html:139
+msgid "Already have an account?"
+msgstr "Du hast bereits ein Konto?"
+
+#: templates/core/signup.html:141
+msgid "Sign in here"
+msgstr "Hier anmelden"

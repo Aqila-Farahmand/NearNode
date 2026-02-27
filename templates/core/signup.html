@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+{% load i18n %}
+<html lang="{{ ui_language|default:LANGUAGE_CODE|default:'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up - NearNode</title>
+    <title>{% trans "Sign Up - NearNode" %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -17,7 +18,7 @@
     <div class="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div class="max-w-md w-full space-y-8">
             <div class="text-center">
-                <h2 class="text-2xl font-semibold text-gray-700">Create your account</h2>
+                <h2 class="text-2xl font-semibold text-gray-700">{% trans "Create your account" %}</h2>
             </div>
 
             <!-- Messages -->
@@ -38,28 +39,28 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label for="first_name" class="block text-sm font-medium text-gray-700 mb-2">
-                                <i class="fas fa-user mr-2"></i>First Name
+                                <i class="fas fa-user mr-2"></i>{% trans "First Name" %}
                             </label>
                             <input id="first_name" name="first_name" type="text"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                placeholder="First name">
+                                placeholder="{% trans 'First name' %}">
                         </div>
                         <div>
                             <label for="last_name" class="block text-sm font-medium text-gray-700 mb-2">
-                                Last Name
+                                {% trans "Last Name" %}
                             </label>
                             <input id="last_name" name="last_name" type="text"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                placeholder="Last name">
+                                placeholder="{% trans 'Last name' %}">
                         </div>
                     </div>
                     <div>
                         <label for="id_username" class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-user mr-2"></i>Username
+                            <i class="fas fa-user mr-2"></i>{% trans "Username" %}
                         </label>
                         <input id="id_username" name="username" type="text" required autocomplete="username"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent {% if form.username.errors %}border-red-500{% endif %}"
-                            placeholder="Choose a username"
+                            placeholder="{% trans 'Choose a username' %}"
                             value="{{ form.username.value|default:'' }}">
                         {% if form.username.errors %}
                             <p class="mt-1 text-sm text-red-600">{{ form.username.errors.0 }}</p>
@@ -70,27 +71,27 @@
                     </div>
                     <div>
                         <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-envelope mr-2"></i>Email
+                            <i class="fas fa-envelope mr-2"></i>{% trans "Email" %}
                         </label>
                         <input id="email" name="email" type="email"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                            placeholder="your.email@example.com">
+                            placeholder="{% trans 'your.email@example.com' %}">
                     </div>
                     <div>
                         <label for="phone_number" class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-phone mr-2"></i>Phone Number
+                            <i class="fas fa-phone mr-2"></i>{% trans "Phone Number" %}
                         </label>
                         <input id="phone_number" name="phone_number" type="tel"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                            placeholder="+1 234 567 8900">
+                            placeholder="{% trans '+1 234 567 8900' %}">
                     </div>
                     <div>
                         <label for="id_password1" class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-lock mr-2"></i>Password
+                            <i class="fas fa-lock mr-2"></i>{% trans "Password" %}
                         </label>
                         <input id="id_password1" name="password1" type="password" required autocomplete="new-password"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent {% if form.password1.errors %}border-red-500{% endif %}"
-                            placeholder="Create a password">
+                            placeholder="{% trans 'Create a password' %}">
                         {% if form.password1.errors %}
                             <p class="mt-1 text-sm text-red-600">{{ form.password1.errors.0 }}</p>
                         {% endif %}
@@ -100,11 +101,11 @@
                     </div>
                     <div>
                         <label for="id_password2" class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-lock mr-2"></i>Confirm Password
+                            <i class="fas fa-lock mr-2"></i>{% trans "Confirm Password" %}
                         </label>
                         <input id="id_password2" name="password2" type="password" required autocomplete="new-password"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent {% if form.password2.errors %}border-red-500{% endif %}"
-                            placeholder="Confirm your password">
+                            placeholder="{% trans 'Confirm your password' %}">
                         {% if form.password2.errors %}
                             <p class="mt-1 text-sm text-red-600">{{ form.password2.errors.0 }}</p>
                         {% endif %}
@@ -116,7 +117,7 @@
 
                 <div>
                     <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity">
-                        <i class="fas fa-user-plus mr-2"></i>Create Account
+                        <i class="fas fa-user-plus mr-2"></i>{% trans "Create Account" %}
                     </button>
                 </div>
 
@@ -126,18 +127,18 @@
                             <div class="w-full border-t border-gray-300"></div>
                         </div>
                         <div class="relative flex justify-center text-sm">
-                            <span class="px-2 bg-white text-gray-500">Or continue with</span>
+                            <span class="px-2 bg-white text-gray-500">{% trans "Or continue with" %}</span>
                         </div>
                     </div>
                     <a href="/accounts/google/login/" 
                         class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors">
                         <i class="fab fa-google text-red-500 mr-2"></i>
-                        Sign up with Google
+                        {% trans "Sign up with Google" %}
                     </a>
                     <p class="text-sm text-gray-600">
-                        Already have an account?
+                        {% trans "Already have an account?" %}
                         <a href="{% url 'login' %}" class="text-blue-600 hover:text-blue-800 font-semibold">
-                            Sign in here
+                            {% trans "Sign in here" %}
                         </a>
                     </p>
                 </div>

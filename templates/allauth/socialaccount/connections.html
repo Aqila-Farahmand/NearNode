@@ -1,9 +1,10 @@
+{% load i18n %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Account Connections - NearNode</title>
+    <title>{% trans "Account Connections - NearNode" %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -21,7 +22,7 @@
                     <i class="fas fa-plane text-4xl text-blue-600"></i>
                     <h1 class="text-4xl font-bold text-gray-900">NearNode</h1>
                 </div>
-                <h2 class="text-2xl font-semibold text-gray-700">Account Connections</h2>
+                <h2 class="text-2xl font-semibold text-gray-700">{% trans "Account Connections" %}</h2>
             </div>
 
             <!-- Messages -->
@@ -38,7 +39,7 @@
             <!-- Connections Card -->
             <div class="bg-white p-8 rounded-lg shadow-md">
                 {% if form.accounts %}
-                    <p class="text-gray-700 mb-4">You can sign in to your account using any of the following third party accounts:</p>
+                    <p class="text-gray-700 mb-4">{% trans "You can sign in to your account using any of the following third party accounts:" %}</p>
                     
                     <form method="post" action="{% url 'socialaccount_connections' %}">
                         {% csrf_token %}
@@ -61,7 +62,7 @@
                                         </div>
                                         <label class="flex items-center">
                                             <input id="id_account_{{ base_account.id }}" name="account" type="radio" value="{{ base_account.id }}" class="mr-2">
-                                            <span class="text-sm text-gray-600">Use this</span>
+                                            <span class="text-sm text-gray-600">{% trans "Use this" %}</span>
                                         </label>
                                     </div>
                                 {% endwith %}
@@ -69,17 +70,17 @@
 
                             <div class="mt-6">
                                 <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity">
-                                    <i class="fas fa-check mr-2"></i>Use Selected Account
+                                    <i class="fas fa-check mr-2"></i>{% trans "Use Selected Account" %}
                                 </button>
                             </div>
                         </fieldset>
                     </form>
                 {% else %}
-                    <p class="text-gray-700 text-center mb-6">You currently have no social network accounts connected to this account.</p>
+                    <p class="text-gray-700 text-center mb-6">{% trans "You currently have no social network accounts connected to this account." %}</p>
                 {% endif %}
 
                 <div class="mt-6 pt-6 border-t border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Add a Third Party Account</h3>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">{% trans "Add a Third Party Account" %}</h3>
                     <ul class="space-y-3">
                         {% include "socialaccount/snippets/provider_list.html" with process="connect" %}
                     </ul>
@@ -89,7 +90,7 @@
             <!-- Back to Home -->
             <div class="text-center">
                 <a href="{% url 'home' %}" class="text-gray-600 hover:text-gray-800 text-sm">
-                    <i class="fas fa-arrow-left mr-2"></i>Back to Home
+                    <i class="fas fa-arrow-left mr-2"></i>{% trans "Back to Home" %}
                 </a>
             </div>
         </div>

@@ -1,4 +1,4 @@
-{% load socialaccount %}
+{% load socialaccount i18n %}
 
 {% get_providers as socialaccount_providers %}
 
@@ -31,7 +31,7 @@
             {% else %}
                 <i class="fas fa-sign-in-alt mr-2"></i>
             {% endif %}
-            Sign in with {{provider.name}}
+            {% blocktrans with provider_name=provider.name %}Sign in with {{ provider_name }}{% endblocktrans %}
         </a>
     </li>
 {% endfor %}
