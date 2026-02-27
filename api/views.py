@@ -23,7 +23,7 @@ from .serializers import (
 from .services import (
     NearestAlternateService, MultiModalConnectionService,
     AISearchService, CollaborativeService, DelayPredictionService,
-    SmartNearbyAirportService,
+    SmartNearbyAirportService, BookingComparisonService,
 )
 from . import amadeus_client
 
@@ -275,6 +275,24 @@ def _nearest_alternate_currency_for_user(user):
         return 'EUR'
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def booking_provider_health(request):
+    """Inspect provider URL health and cache state."""
+    refresh_value = (request.query_params.get('refresh') or '').strip().lower()
+    refresh = refresh_value in ('1', 'true', 'yes', 'on')
+    try:
+        limit = int(request.query_params.get('limit', 40))
+    except (TypeError, ValueError):
+        limit = 40
+    return Response(
+        BookingComparisonService.health_snapshot(
+            refresh=refresh,
+            max_providers=limit,
+        )
+    )
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def nearest_alternate_search(request):
@@ -356,6 +374,11 @@ def _serialize_one_alternate(result, rate, currency, use_real_api):
         result.get('return_flight_time_minutes'),
         _as_float((flight_data or {}).get('return_duration_minutes', 0) if isinstance(flight_data, dict) else 0),
     )
+    booking_options = BookingComparisonService.build_booking_options(
+        flight_data=flight_data if isinstance(flight_data, dict) else {},
+        total_cost_eur=total_cost,
+        trip_type=result.get('trip_type') or (flight_data.get('trip_type') if isinstance(flight_data, dict) else 'one_way') or 'one_way',
+    )
     return {
         'flight': flight_data,
         'flight_leg': flight_data,
@@ -378,6 +401,8 @@ def _serialize_one_alternate(result, rate, currency, use_real_api):
         'outbound_flight_duration_minutes': int(outbound_flight_duration or 0),
         'return_flight_duration_minutes': int(return_flight_duration or 0),
         'ground_duration_minutes': ground_duration,
+        'booking_options': booking_options,
+        'best_booking_option': booking_options[0] if booking_options else None,
     }
 
 

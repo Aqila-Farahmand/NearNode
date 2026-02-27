@@ -2,7 +2,10 @@
 Service layer for business logic
 """
 import json
-from datetime import datetime, timedelta, date
+import time
+from datetime import datetime, timedelta, date, timezone
+from copy import deepcopy
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
 import openai
@@ -1404,3 +1407,556 @@ class DelayPredictionService:
             'risk_percentage': risk,
             'recommendation': recommendation
         }
+
+
+class BookingComparisonService:
+    """Generate and rank booking sources for one flight offer."""
+    LUFTHANSA_DOMAIN = 'lufthansa.com'
+    LUFTHANSA_URL = 'https://www.lufthansa.com'
+
+    GLOBAL_BOOKING_SITES = [
+        {
+            'name': 'Skyscanner',
+            'domain': 'skyscanner.net',
+            'base_url': 'https://www.skyscanner.net/',
+            'price_multiplier': 0.985,
+            'base_fee_eur': 3.0,
+            'trust_score': 0.90,
+            'refundability': 'partial',
+            'included_baggage_kg': 15,
+            'hidden_fee_risk': 0.10,
+        },
+        {
+            'name': 'Kayak',
+            'domain': 'kayak.com',
+            'base_url': 'https://www.kayak.com/flights',
+            'price_multiplier': 0.99,
+            'base_fee_eur': 2.0,
+            'trust_score': 0.88,
+            'refundability': 'partial',
+            'included_baggage_kg': 15,
+            'hidden_fee_risk': 0.12,
+        },
+        {
+            'name': 'Momondo',
+            'domain': 'momondo.com',
+            'base_url': 'https://www.momondo.com',
+            'price_multiplier': 0.99,
+            'base_fee_eur': 2.5,
+            'trust_score': 0.87,
+            'refundability': 'partial',
+            'included_baggage_kg': 15,
+            'hidden_fee_risk': 0.13,
+        },
+        {
+            'name': 'Kiwi.com',
+            'domain': 'kiwi.com',
+            'base_url': 'https://www.kiwi.com/en/',
+            'price_multiplier': 0.98,
+            'base_fee_eur': 6.0,
+            'trust_score': 0.80,
+            'refundability': 'restricted',
+            'included_baggage_kg': 10,
+            'hidden_fee_risk': 0.18,
+        },
+        {
+            'name': 'Expedia',
+            'domain': 'expedia.com',
+            'base_url': 'https://www.expedia.com/Flights',
+            'price_multiplier': 1.00,
+            'base_fee_eur': 3.0,
+            'trust_score': 0.89,
+            'refundability': 'partial',
+            'included_baggage_kg': 15,
+            'hidden_fee_risk': 0.12,
+        },
+        {
+            'name': 'Trip.com',
+            'domain': 'trip.com',
+            'base_url': 'https://www.trip.com/flights/',
+            'price_multiplier': 0.995,
+            'base_fee_eur': 3.5,
+            'trust_score': 0.86,
+            'refundability': 'partial',
+            'included_baggage_kg': 15,
+            'hidden_fee_risk': 0.14,
+        },
+        {
+            'name': 'Google Flights',
+            'domain': 'google.com',
+            'base_url': 'https://www.google.com/travel/flights',
+            'price_multiplier': 1.0,
+            'base_fee_eur': 0.0,
+            'trust_score': 0.92,
+            'refundability': 'partial',
+            'included_baggage_kg': 15,
+            'hidden_fee_risk': 0.08,
+        },
+    ]
+
+    AIRLINE_DIRECT_SITES = {
+        'luxair': {'name': 'Luxair', 'domain': 'luxair.lu', 'base_url': 'https://www.luxair.lu/en/book'},
+        'lufthansa': {'name': 'Lufthansa', 'domain': LUFTHANSA_DOMAIN, 'base_url': LUFTHANSA_URL},
+        'ryanair': {'name': 'Ryanair', 'domain': 'ryanair.com', 'base_url': 'https://www.ryanair.com'},
+        'klm': {'name': 'KLM', 'domain': 'klm.com', 'base_url': 'https://www.klm.com'},
+        'air france': {'name': 'Air France', 'domain': 'airfrance.com', 'base_url': 'https://wwws.airfrance.com'},
+        'british airways': {'name': 'British Airways', 'domain': 'britishairways.com', 'base_url': 'https://www.britishairways.com'},
+        'turkish airlines': {'name': 'Turkish Airlines', 'domain': 'turkishairlines.com', 'base_url': 'https://www.turkishairlines.com'},
+        'easyjet': {'name': 'easyJet', 'domain': 'easyjet.com', 'base_url': 'https://www.easyjet.com'},
+        'wizz air': {'name': 'Wizz Air', 'domain': 'wizzair.com', 'base_url': 'https://wizzair.com'},
+    }
+
+    LOCAL_AIRPORT_DIRECT_SITES = {
+        'LUX': {'name': 'Luxair', 'domain': 'luxair.lu', 'base_url': 'https://www.luxair.lu/en/book'},
+        'FRA': {'name': 'Lufthansa', 'domain': LUFTHANSA_DOMAIN, 'base_url': LUFTHANSA_URL},
+        'MUC': {'name': 'Lufthansa', 'domain': LUFTHANSA_DOMAIN, 'base_url': LUFTHANSA_URL},
+        'AMS': {'name': 'KLM', 'domain': 'klm.com', 'base_url': 'https://www.klm.com'},
+        'CDG': {'name': 'Air France', 'domain': 'airfrance.com', 'base_url': 'https://wwws.airfrance.com'},
+        'MAD': {'name': 'Iberia', 'domain': 'iberia.com', 'base_url': 'https://www.iberia.com'},
+        'BCN': {'name': 'Vueling', 'domain': 'vueling.com', 'base_url': 'https://www.vueling.com'},
+        'FCO': {'name': 'ITA Airways', 'domain': 'ita-airways.com', 'base_url': 'https://www.ita-airways.com'},
+    }
+    _URL_HEALTH_CACHE = {}
+
+    @staticmethod
+    def _clamp(value, low=0.0, high=1.0):
+        return max(low, min(high, float(value)))
+
+    @staticmethod
+    def _refund_score(refundability):
+        if refundability == 'flexible':
+            return 1.0
+        if refundability == 'partial':
+            return 0.6
+        return 0.2
+
+    @staticmethod
+    def _deep_link(provider_name, origin_code, destination_code, airline):
+        query = '{} {} {} {}'.format(provider_name, origin_code or '', destination_code or '', airline or '').strip()
+        return BookingComparisonService._attach_tracking_params(
+            'https://www.google.com/search?q={}'.format(query.replace(' ', '+')),
+            provider_name=provider_name,
+            origin_code=origin_code,
+            destination_code=destination_code,
+            departure_date='',
+        )
+
+    @staticmethod
+    def _provider_key(provider_name):
+        text = (provider_name or '').strip().lower()
+        if not text:
+            return ''
+        out = []
+        for ch in text:
+            if ch.isalnum():
+                out.append(ch)
+            else:
+                out.append('_')
+        return ''.join(out).strip('_')
+
+    @staticmethod
+    def _configured_global_sites():
+        configured = getattr(settings, 'BOOKING_GLOBAL_SITES', None)
+        if isinstance(configured, list) and configured:
+            return deepcopy(configured)
+        return deepcopy(BookingComparisonService.GLOBAL_BOOKING_SITES)
+
+    @staticmethod
+    def _configured_airline_direct_sites():
+        configured = getattr(settings, 'BOOKING_AIRLINE_DIRECT_SITES', None)
+        if not isinstance(configured, dict):
+            return deepcopy(BookingComparisonService.AIRLINE_DIRECT_SITES)
+        merged = deepcopy(BookingComparisonService.AIRLINE_DIRECT_SITES)
+        for key, value in configured.items():
+            if isinstance(value, dict):
+                merged[str(key).lower()] = value
+        return merged
+
+    @staticmethod
+    def _configured_local_airport_sites():
+        configured = getattr(settings, 'BOOKING_LOCAL_AIRPORT_DIRECT_SITES', None)
+        if not isinstance(configured, dict):
+            return deepcopy(BookingComparisonService.LOCAL_AIRPORT_DIRECT_SITES)
+        merged = deepcopy(BookingComparisonService.LOCAL_AIRPORT_DIRECT_SITES)
+        for key, value in configured.items():
+            if isinstance(value, dict):
+                merged[str(key).upper()] = value
+        return merged
+
+    @staticmethod
+    def _provider_tracking_params(provider_name):
+        all_provider_params = getattr(settings, 'BOOKING_PROVIDER_TRACKING_PARAMS', {}) or {}
+        if not isinstance(all_provider_params, dict):
+            return {}
+        params = all_provider_params.get(BookingComparisonService._provider_key(provider_name), {})
+        return params if isinstance(params, dict) else {}
+
+    @staticmethod
+    def _healthcheck_enabled():
+        return bool(getattr(settings, 'BOOKING_URL_HEALTHCHECK_ENABLED', False))
+
+    @staticmethod
+    def _healthcheck_ttl_seconds():
+        try:
+            value = int(getattr(settings, 'BOOKING_URL_HEALTHCHECK_TTL_SECONDS', 21600))
+            return max(value, 30)
+        except (TypeError, ValueError):
+            return 21600
+
+    @staticmethod
+    def _healthcheck_timeout_seconds():
+        try:
+            value = float(getattr(settings, 'BOOKING_URL_HEALTHCHECK_TIMEOUT_SECONDS', 3.0))
+            return max(value, 0.5)
+        except (TypeError, ValueError):
+            return 3.0
+
+    @staticmethod
+    def _is_healthy_status(status_code):
+        # Some providers block bots with 401/403/429 but the site is still reachable for users.
+        if status_code in (401, 403, 405, 429):
+            return True
+        return status_code < 400
+
+    @staticmethod
+    def _check_provider_url_health(base_url):
+        now = time.time()
+        ttl = BookingComparisonService._healthcheck_ttl_seconds()
+        cached = BookingComparisonService._URL_HEALTH_CACHE.get(base_url)
+        if cached and (now - cached['checked_at']) < ttl:
+            return cached['is_healthy']
+
+        is_healthy = True
+        try:
+            timeout = BookingComparisonService._healthcheck_timeout_seconds()
+            with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+                response = client.head(base_url)
+                if response.status_code == 405:
+                    response = client.get(base_url)
+                is_healthy = BookingComparisonService._is_healthy_status(response.status_code)
+        except Exception:
+            # Fail-open on transient network errors to avoid hiding all providers.
+            is_healthy = True
+
+        BookingComparisonService._URL_HEALTH_CACHE[base_url] = {
+            'is_healthy': is_healthy,
+            'checked_at': now,
+        }
+        return is_healthy
+
+    @staticmethod
+    def _is_provider_healthy(provider):
+        if not BookingComparisonService._healthcheck_enabled():
+            return True
+        base_url = (provider.get('base_url') or '').strip()
+        if not base_url:
+            return True
+        return BookingComparisonService._check_provider_url_health(base_url)
+
+    @staticmethod
+    def _provider_catalog():
+        catalog = []
+        seen = set()
+
+        def add(source, provider):
+            if not isinstance(provider, dict):
+                return
+            name = (provider.get('name') or '').strip()
+            base_url = (provider.get('base_url') or '').strip()
+            key = (name.lower(), base_url.lower())
+            if not name or key in seen:
+                return
+            seen.add(key)
+            catalog.append({
+                'source': source,
+                'name': name,
+                'domain': (provider.get('domain') or '').strip(),
+                'base_url': base_url,
+            })
+
+        for provider in BookingComparisonService._configured_global_sites():
+            add('global', provider)
+        for provider in BookingComparisonService._configured_airline_direct_sites().values():
+            add('airline_direct', provider)
+        for provider in BookingComparisonService._configured_local_airport_sites().values():
+            add('local_airport_direct', provider)
+        return catalog
+
+    @staticmethod
+    def _provider_health_state(provider, refresh, enabled):
+        base_url = provider.get('base_url') or ''
+        cached = BookingComparisonService._URL_HEALTH_CACHE.get(base_url) if base_url else None
+        checked_at = cached.get('checked_at') if cached else None
+        if refresh and enabled and base_url:
+            is_healthy = BookingComparisonService._check_provider_url_health(base_url)
+            cached = BookingComparisonService._URL_HEALTH_CACHE.get(base_url)
+            checked_at = cached.get('checked_at') if cached else checked_at
+            return is_healthy, checked_at
+        if cached:
+            return cached.get('is_healthy'), checked_at
+        return None, None
+
+    @staticmethod
+    def health_snapshot(refresh=False, max_providers=40):
+        catalog = BookingComparisonService._provider_catalog()[:max(1, int(max_providers or 40))]
+        enabled = BookingComparisonService._healthcheck_enabled()
+        providers = []
+        for provider in catalog:
+            is_healthy, checked_at = BookingComparisonService._provider_health_state(
+                provider=provider,
+                refresh=refresh,
+                enabled=enabled,
+            )
+            providers.append({
+                **provider,
+                'is_healthy': is_healthy,
+                'checked_at': datetime.fromtimestamp(checked_at, tz=timezone.utc).isoformat() if checked_at else None,
+            })
+        return {
+            'healthcheck_enabled': enabled,
+            'healthcheck_ttl_seconds': BookingComparisonService._healthcheck_ttl_seconds(),
+            'healthcheck_timeout_seconds': BookingComparisonService._healthcheck_timeout_seconds(),
+            'cache_entries': len(BookingComparisonService._URL_HEALTH_CACHE),
+            'providers': providers,
+        }
+
+    @staticmethod
+    def _default_tracking_params():
+        value = getattr(settings, 'BOOKING_DEFAULT_TRACKING_PARAMS', {}) or {}
+        return value if isinstance(value, dict) else {}
+
+    @staticmethod
+    def _attach_tracking_params(url, provider_name, origin_code, destination_code, departure_date):
+        if not url:
+            return ''
+        parsed = urlparse(url)
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query.update(BookingComparisonService._default_tracking_params())
+        query.update(BookingComparisonService._provider_tracking_params(provider_name))
+        query.setdefault('utm_source', 'nearnode')
+        query.setdefault('utm_medium', 'metasearch')
+        query.setdefault('utm_campaign', 'booking_redirect')
+        if origin_code:
+            query.setdefault('nn_origin', origin_code)
+        if destination_code:
+            query.setdefault('nn_destination', destination_code)
+        if departure_date:
+            query.setdefault('nn_departure_date', departure_date)
+        return urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
+
+    @staticmethod
+    def _logo_url_for_domain(domain):
+        if not domain:
+            return ''
+        return 'https://logo.clearbit.com/{}'.format(domain)
+
+    @staticmethod
+    def _booking_url(provider, origin_code, destination_code, departure_date):
+        template = (provider.get('base_url') or '').strip()
+        if not template:
+            return ''
+        raw = template.format(
+            origin=(origin_code or '').lower(),
+            destination=(destination_code or '').lower(),
+            date=(departure_date or ''),
+        )
+        return BookingComparisonService._attach_tracking_params(
+            raw,
+            provider_name=provider.get('name', ''),
+            origin_code=origin_code,
+            destination_code=destination_code,
+            departure_date=departure_date,
+        )
+
+    @staticmethod
+    def _departure_date(flight):
+        dep = (flight.get('departure_time') or '').strip()
+        if dep and len(dep) >= 10:
+            return dep[:10]
+        return datetime.now(timezone.utc).date().isoformat()
+
+    @staticmethod
+    def _provider_payload(name, domain, base_url, trust_score=0.93, refundability='flexible'):
+        return {
+            'name': name,
+            'domain': domain,
+            'base_url': base_url,
+            'price_multiplier': 1.0,
+            'base_fee_eur': 0.0,
+            'trust_score': trust_score,
+            'refundability': refundability,
+            'included_baggage_kg': 20,
+            'hidden_fee_risk': 0.05,
+        }
+
+    @staticmethod
+    def _airline_direct_provider(airline_name):
+        airline = (airline_name or '').strip().lower()
+        if not airline:
+            return None
+        for key, site in BookingComparisonService._configured_airline_direct_sites().items():
+            if key in airline:
+                return BookingComparisonService._provider_payload(
+                    site['name'], site['domain'], site['base_url']
+                )
+        return None
+
+    @staticmethod
+    def _local_airport_providers(origin_code, destination_code):
+        local = []
+        local_sites = BookingComparisonService._configured_local_airport_sites()
+        for code in (origin_code, destination_code):
+            site = local_sites.get(code)
+            if not site:
+                continue
+            local.append(
+                BookingComparisonService._provider_payload(
+                    site['name'], site['domain'], site['base_url']
+                )
+            )
+        return local
+
+    @staticmethod
+    def _build_provider_list(origin_code, destination_code, airline):
+        providers = []
+        seen_names = set()
+
+        def add_provider(provider):
+            if not provider:
+                return
+            if not BookingComparisonService._is_provider_healthy(provider):
+                return
+            key = (provider.get('name') or '').strip().lower()
+            if not key or key in seen_names:
+                return
+            seen_names.add(key)
+            providers.append(provider)
+
+        # Prioritize direct airline and local airport carriers first.
+        add_provider(BookingComparisonService._airline_direct_provider(airline))
+        for local in BookingComparisonService._local_airport_providers(origin_code, destination_code):
+            add_provider(local)
+        add_provider(BookingComparisonService._provider_payload(
+            'Airline Direct', '', ''
+        ))
+
+        for provider in BookingComparisonService._configured_global_sites():
+            add_provider(dict(provider))
+        return providers
+
+    @staticmethod
+    def _provider_variation(seed, idx):
+        # Keep pricing stable per offer/provider so results are deterministic.
+        raw = ((seed * (idx + 5)) % 11) - 5  # range: -5..5
+        return raw / 1000.0  # +/- 0.5%
+
+    @staticmethod
+    def _option_from_provider(provider, base_total, trip_type, seed, idx, origin_code, destination_code, departure_date, airline):
+        variation = BookingComparisonService._provider_variation(seed, idx)
+        variable_multiplier = provider['price_multiplier'] + variation
+        base_price = round(base_total * variable_multiplier, 2)
+        taxes_fees = round(base_price * (0.08 if trip_type == 'round_trip' else 0.06), 2)
+        payment_fee = round(provider['base_fee_eur'], 2)
+        total_price = round(base_price + taxes_fees + payment_fee, 2)
+        booking_url = BookingComparisonService._booking_url(
+            provider, origin_code, destination_code, departure_date
+        ) or BookingComparisonService._deep_link(
+            provider['name'], origin_code, destination_code, airline
+        )
+        return {
+            'provider_name': provider['name'],
+            'provider_logo_url': BookingComparisonService._logo_url_for_domain(provider.get('domain', '')),
+            'base_price_eur': base_price,
+            'taxes_fees_eur': taxes_fees,
+            'payment_fees_estimate_eur': payment_fee,
+            'total_price_eur': total_price,
+            'included_baggage_kg': int(provider['included_baggage_kg']),
+            'refundability': provider['refundability'],
+            'provider_rating': round(provider['trust_score'] * 5, 2),
+            'trust_score': provider['trust_score'],
+            'hidden_fee_risk': provider['hidden_fee_risk'],
+            'booking_url': booking_url,
+            'deep_link': booking_url,
+            'fetched_at': datetime.now(timezone.utc).isoformat(),
+        }
+
+    @staticmethod
+    def _score_and_sort_options(options):
+        price_min = min(opt['total_price_eur'] for opt in options)
+        price_max = max(opt['total_price_eur'] for opt in options)
+        price_span = max(price_max - price_min, 0.01)
+        for option in options:
+            price_score = 1.0 - ((option['total_price_eur'] - price_min) / price_span)
+            baggage_score = BookingComparisonService._clamp(option['included_baggage_kg'] / 25.0)
+            refund_score = BookingComparisonService._refund_score(option['refundability'])
+            freshness_score = 1.0
+            trust_score = BookingComparisonService._clamp(option['trust_score'])
+            hidden_fee_penalty = option['hidden_fee_risk'] * 0.15
+            booking_score = (
+                0.55 * price_score +
+                0.15 * trust_score +
+                0.10 * refund_score +
+                0.10 * baggage_score +
+                0.10 * freshness_score -
+                hidden_fee_penalty
+            )
+            option['booking_score'] = round(BookingComparisonService._clamp(booking_score) * 100, 2)
+            option['badges'] = []
+            option.pop('trust_score', None)
+        options.sort(key=lambda x: (-x['booking_score'], x['total_price_eur']))
+        return options
+
+    @staticmethod
+    def _add_booking_badges(options):
+        if not options:
+            return options
+        cheapest_idx = min(
+            range(len(options)),
+            key=lambda idx: (options[idx]['total_price_eur'], -options[idx]['booking_score']),
+        )
+        flexible_idx = max(
+            range(len(options)),
+            key=lambda idx: (
+                BookingComparisonService._refund_score(options[idx]['refundability']),
+                options[idx]['booking_score'],
+            ),
+        )
+        options[0]['badges'].append('best')
+        options[cheapest_idx]['badges'].append('cheapest')
+        options[flexible_idx]['badges'].append('most_flexible')
+        return options
+
+    @staticmethod
+    def build_booking_options(flight_data, total_cost_eur, trip_type='one_way'):
+        if total_cost_eur is None:
+            return []
+        base_total = _safe_float(total_cost_eur, 0.0)
+        if base_total <= 0:
+            return []
+        flight = flight_data if isinstance(flight_data, dict) else {}
+        origin_code = ((flight.get('origin_airport') or {}).get('iata_code') or '').strip().upper()
+        destination_code = ((flight.get('destination_airport') or {}).get('iata_code') or '').strip().upper()
+        airline = (flight.get('airline') or '').strip()
+        offer_id = str(flight.get('id') or flight.get('flight_number') or '{}-{}'.format(origin_code, destination_code))
+        seed = sum(ord(ch) for ch in offer_id) or 1
+        departure_date = BookingComparisonService._departure_date(flight)
+        providers = BookingComparisonService._build_provider_list(
+            origin_code, destination_code, airline
+        )
+
+        options = [
+            BookingComparisonService._option_from_provider(
+                provider=provider,
+                base_total=base_total,
+                trip_type=trip_type,
+                seed=seed,
+                idx=idx,
+                origin_code=origin_code,
+                destination_code=destination_code,
+                departure_date=departure_date,
+                airline=airline,
+            )
+            for idx, provider in enumerate(providers)
+        ]
+        scored = BookingComparisonService._score_and_sort_options(options)
+        return BookingComparisonService._add_booking_badges(scored)

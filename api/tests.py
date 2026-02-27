@@ -2,7 +2,7 @@
 API tests for NearNode.
 Run: python manage.py test api
 """
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -243,12 +243,84 @@ class SmartNearestAlternateSearchTest(TestCase):
     def test_response_includes_ground_and_flight_breakdown(self):
         r = self._search()
         self.assertEqual(r.status_code, 200)
-        first = r.json().get('results', [])[0]
+        results = r.json().get('results', [])
+        first = results[0]
         self.assertIn('ground_leg', first)
         self.assertIn('flight_leg', first)
         self.assertIn('flight_cost_eur', first)
         self.assertIn('ground_cost_eur', first)
         self.assertIn('origin_distance_km', first)
+        self.assertIn('booking_options', first)
+        self.assertIn('best_booking_option', first)
+        self.assertGreaterEqual(len(first.get('booking_options', [])), 1)
+        first_option = first['booking_options'][0]
+        self.assertIn('booking_score', first_option)
+        self.assertIn('provider_name', first_option)
+        self.assertIn('booking_url', first_option)
+        self.assertIn('provider_logo_url', first_option)
+        self.assertTrue(first_option.get('booking_url', '').startswith('http'))
+        self.assertIn('utm_source=nearnode', first_option.get('booking_url', ''))
+        self.assertIn('nn_origin=', first_option.get('booking_url', ''))
+        self.assertIn('nn_destination=', first_option.get('booking_url', ''))
+
+        all_provider_names = {
+            opt.get('provider_name')
+            for item in results
+            for opt in item.get('booking_options', [])
+        }
+        self.assertIn('Skyscanner', all_provider_names)
+        self.assertTrue(
+            any(name in all_provider_names for name in ('Luxair', 'Lufthansa'))
+        )
+
+    @override_settings(
+        BOOKING_GLOBAL_SITES=[
+            {
+                'name': 'Custom OTA',
+                'domain': 'example.com',
+                'base_url': 'https://example.com/book/{origin}/{destination}/{date}',
+                'price_multiplier': 1.01,
+                'base_fee_eur': 1.0,
+                'trust_score': 0.84,
+                'refundability': 'partial',
+                'included_baggage_kg': 15,
+                'hidden_fee_risk': 0.11,
+            }
+        ],
+        BOOKING_PROVIDER_TRACKING_PARAMS={
+            'custom_ota': {'aff_id': 'partner42'}
+        },
+        BOOKING_LOCAL_AIRPORT_DIRECT_SITES={
+            'ZAG': {'name': 'Croatia Airlines', 'domain': 'croatiaairlines.com', 'base_url': 'https://www.croatiaairlines.com'}
+        },
+    )
+    def test_booking_sources_and_tracking_are_configurable_from_settings(self):
+        r = self._search()
+        self.assertEqual(r.status_code, 200)
+        results = r.json().get('results', [])
+        all_options = [opt for item in results for opt in item.get('booking_options', [])]
+        provider_names = {opt.get('provider_name') for opt in all_options}
+        self.assertIn('Custom OTA', provider_names)
+        self.assertIn('Croatia Airlines', provider_names)
+        self.assertNotIn('Skyscanner', provider_names)
+        custom = next((opt for opt in all_options if opt.get('provider_name') == 'Custom OTA'), None)
+        self.assertIsNotNone(custom)
+        self.assertIn('aff_id=partner42', custom.get('booking_url', ''))
+
+    @override_settings(BOOKING_URL_HEALTHCHECK_ENABLED=True)
+    @patch('api.services.BookingComparisonService._check_provider_url_health')
+    def test_healthcheck_filters_unhealthy_providers(self, mock_health):
+        mock_health.side_effect = lambda url: 'skyscanner.net' not in url
+        r = self._search()
+        self.assertEqual(r.status_code, 200)
+        results = r.json().get('results', [])
+        all_provider_names = {
+            opt.get('provider_name')
+            for item in results
+            for opt in item.get('booking_options', [])
+        }
+        self.assertNotIn('Skyscanner', all_provider_names)
+        self.assertIn('Kayak', all_provider_names)
 
     def test_round_trip_requires_return_date(self):
         r = self._search(trip_type='round_trip')
@@ -263,3 +335,28 @@ class SmartNearestAlternateSearchTest(TestCase):
         self.assertEqual(data.get('trip_type'), 'round_trip')
         first = data.get('results', [])[0]
         self.assertEqual(first.get('flight', {}).get('trip_type'), 'round_trip')
+
+
+class BookingProviderHealthAPITest(TestCase):
+    """Provider health monitoring endpoint."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='healthuser', email='health@example.com', password=TEST_AUTH_SECRET
+        )
+        self.client.force_authenticate(user=self.user)
+
+    @override_settings(BOOKING_URL_HEALTHCHECK_ENABLED=True)
+    @patch('api.services.BookingComparisonService._check_provider_url_health')
+    def test_health_endpoint_returns_provider_status(self, mock_health):
+        mock_health.side_effect = lambda url: 'kayak.com' not in url
+        r = self.client.get('/api/booking-providers/health/?refresh=1&limit=8')
+        self.assertEqual(r.status_code, 200)
+        payload = r.json()
+        self.assertTrue(payload.get('healthcheck_enabled'))
+        self.assertIn('providers', payload)
+        self.assertLessEqual(len(payload.get('providers', [])), 8)
+        by_name = {row.get('name'): row for row in payload.get('providers', [])}
+        if 'Kayak' in by_name:
+            self.assertFalse(by_name['Kayak'].get('is_healthy'))

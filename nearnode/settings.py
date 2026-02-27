@@ -214,6 +214,35 @@ AI_SEARCH_OPENAI_MODEL = config('AI_SEARCH_OPENAI_MODEL', default='')
 AI_SEARCH_GROQ_MODEL = config('AI_SEARCH_GROQ_MODEL', default='')
 AI_SEARCH_OLLAMA_MODEL = config('AI_SEARCH_OLLAMA_MODEL', default='')
 
+# Booking source overrides (optional).
+# - Keep empty to use built-in defaults from BookingComparisonService.
+# - Provide a full list/dict to replace/extend behavior without editing code.
+BOOKING_GLOBAL_SITES = []
+BOOKING_AIRLINE_DIRECT_SITES = {}
+BOOKING_LOCAL_AIRPORT_DIRECT_SITES = {}
+
+# Tracking params appended to outbound booking URLs.
+BOOKING_DEFAULT_TRACKING_PARAMS = {
+    'utm_source': 'nearnode',
+    'utm_medium': 'metasearch',
+    'utm_campaign': 'booking_redirect',
+}
+# Per-provider keys use normalized provider names (lowercase with non-alnum -> "_"),
+# e.g. "Google Flights" => "google_flights", "Kiwi.com" => "kiwi_com".
+BOOKING_PROVIDER_TRACKING_PARAMS = {}
+
+# Optional provider URL health checks to auto-skip broken booking links.
+# Set BOOKING_URL_HEALTHCHECK_ENABLED=true in .env to enable.
+BOOKING_URL_HEALTHCHECK_ENABLED = config(
+    'BOOKING_URL_HEALTHCHECK_ENABLED', default=False, cast=bool
+)
+BOOKING_URL_HEALTHCHECK_TTL_SECONDS = config(
+    'BOOKING_URL_HEALTHCHECK_TTL_SECONDS', default=21600, cast=int
+)
+BOOKING_URL_HEALTHCHECK_TIMEOUT_SECONDS = config(
+    'BOOKING_URL_HEALTHCHECK_TIMEOUT_SECONDS', default=3.0, cast=float
+)
+
 # Authentication settings
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'

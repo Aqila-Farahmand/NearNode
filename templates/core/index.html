@@ -8,50 +8,256 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        :root {
+            --nn-bg: #f5f5f7;
+            --nn-surface: #ffffff;
+            --nn-text-primary: #1d1d1f;
+            --nn-text-secondary: #6e6e73;
+            --nn-border: #d2d2d7;
+            --nn-blue: #0071e3;
+            --nn-blue-soft: #e8f2ff;
+            --nn-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        }
         .gradient-bg {
-            background: linear-gradient(135deg, #34A8EB 0%, #1e6bb8 50%, #0f4c81 100%);
+            background: linear-gradient(180deg, #0a84ff 0%, #0071e3 100%);
+        }
+        .surface-card {
+            background: var(--nn-surface);
+            border: 1px solid rgba(210, 210, 215, 0.7);
+            border-radius: 16px;
+            box-shadow: var(--nn-shadow);
+        }
+        .tab-shell {
+            padding: 8px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .tab-shell::-webkit-scrollbar {
+            display: none;
         }
         .tab-btn {
-            border-bottom: 2px solid transparent;
-            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+            border: 0;
+            border-radius: 9999px;
+            min-height: 40px;
+            white-space: nowrap;
+            transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
         }
         .tab-btn:hover {
-            color: #0a3d66;
+            color: var(--nn-text-primary);
+            background: rgba(0, 113, 227, 0.08);
         }
         .tab-btn.active {
-            color: #0f4c81;
-            border-bottom-color: #1e6bb8;
+            color: #fff;
+            background: var(--nn-blue);
         }
         .card-hover {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         .card-hover:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+        }
+        body {
+            background: radial-gradient(1200px 700px at 10% -20%, #eaf3ff, transparent), var(--nn-bg);
+            color: var(--nn-text-primary);
+        }
+        input[type="text"], input[type="number"], input[type="date"], textarea {
+            border-radius: 12px !important;
+            border-color: var(--nn-border) !important;
+            background: #fff;
+        }
+        input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, textarea:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15) !important;
+            border-color: rgba(0, 113, 227, 0.55) !important;
+        }
+        .primary-action {
+            border-radius: 12px;
+            font-weight: 600;
+            min-height: 44px;
+        }
+        .mobile-submit-bar {
+            position: sticky;
+            bottom: 0;
+            padding-top: 10px;
+            padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+            background: linear-gradient(180deg, rgba(245, 245, 247, 0) 0%, rgba(245, 245, 247, 0.95) 35%);
+        }
+        .tap-target {
+            min-height: 44px;
+        }
+        .mobile-book-cta {
+            position: sticky;
+            bottom: 0;
+            z-index: 5;
+            margin-top: 12px;
+            padding-top: 10px;
+            padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.95) 45%);
+        }
+        .trip-type-group {
+            display: inline-flex;
+            gap: 6px;
+            border: 1px solid var(--nn-border);
+            border-radius: 9999px;
+            padding: 4px;
+            background: #fff;
+        }
+        .trip-type-option {
+            min-height: 40px;
+            padding: 0 14px;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #4b5563;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .trip-type-option.active {
+            background: var(--nn-blue);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0, 113, 227, 0.35);
+        }
+        .return-date-collapsible {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            pointer-events: none;
+            transition: max-height 0.28s ease, opacity 0.2s ease;
+        }
+        .return-date-collapsible.expanded {
+            max-height: 120px;
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .momondo-trip-type {
+            margin-bottom: 14px;
+        }
+        .momondo-search-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: flex-end;
+            padding: 12px;
+            border: 1px solid rgba(210, 210, 215, 0.9);
+            border-radius: 14px;
+            background: #fff;
+        }
+        .momondo-search-field {
+            flex: 1 1 180px;
+            min-width: 150px;
+        }
+        .swap-route-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 9999px;
+            border: 1px solid rgba(210, 210, 215, 0.9);
+            background: #fff;
+            color: #374151;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+        }
+        .swap-route-btn:hover {
+            transform: rotate(180deg);
+            background: var(--nn-blue-soft);
+            color: var(--nn-blue);
+        }
+        .momondo-search-field input {
+            min-height: 44px;
+        }
+        .return-date-inline {
+            flex: 1 1 170px;
+            min-width: 0;
+            width: 0;
+            max-width: 0;
+            opacity: 0;
+            overflow: hidden;
+            pointer-events: none;
+            transition: max-width 0.28s ease, opacity 0.2s ease;
+        }
+        .return-date-inline.expanded {
+            min-width: 150px;
+            max-width: 220px;
+            width: auto;
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .momondo-search-btn {
+            min-height: 46px;
+            border-radius: 12px;
+            padding: 0 18px;
+            font-weight: 700;
+            color: #fff;
+            background: linear-gradient(180deg, #006edc 0%, #005bb8 100%);
+            box-shadow: 0 8px 18px rgba(0, 113, 227, 0.28);
+        }
+        .momondo-search-btn:hover {
+            filter: brightness(1.05);
+        }
+        @media (max-width: 768px) {
+            .surface-card {
+                border-radius: 14px;
+            }
+            .tab-shell {
+                gap: 6px;
+                padding: 6px;
+            }
+            .tab-btn {
+                min-height: 44px;
+                padding-left: 14px !important;
+                padding-right: 14px !important;
+            }
+            .trip-type-option {
+                min-height: 44px;
+            }
+            .mobile-submit-bar .primary-action {
+                width: 100%;
+            }
+            .momondo-search-bar {
+                align-items: stretch;
+            }
+            .momondo-search-field,
+            .return-date-inline,
+            .return-date-inline.expanded {
+                min-width: 100%;
+                max-width: 100%;
+            }
+            .momondo-search-btn {
+                width: 100%;
+            }
+            .swap-route-btn {
+                width: 100%;
+                border-radius: 12px;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-50">
+<body>
     {% include 'core/includes/nav.html' %}
 
     <!-- Main Container -->
     <div class="container mx-auto px-4 py-8">
         <!-- Feature Tabs -->
-        <div class="bg-white rounded-lg shadow-md mb-6">
-            <div class="flex border-b">
-                <button class="tab-btn active px-6 py-4 font-semibold border-b-2 text-gray-600" data-tab="nearest-alternate">
+        <div class="surface-card mb-6">
+            <div class="tab-shell flex items-center gap-2">
+                <button class="tab-btn active px-5 py-2.5 font-semibold text-gray-600" data-tab="nearest-alternate">
                     <i class="fas fa-map-marker-alt mr-2"></i>{% trans "Nearest Alternate" %}
                 </button>
-                <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="multi-modal">
+                <button class="tab-btn px-5 py-2.5 font-semibold text-gray-600" data-tab="multi-modal">
                     <i class="fas fa-train mr-2"></i>{% trans "Multi-Modal" %}
                 </button>
-                <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="ai-search">
+                <button class="tab-btn px-5 py-2.5 font-semibold text-gray-600" data-tab="ai-search">
                     <i class="fas fa-search mr-2"></i>{% trans "AI Search" %}
                 </button>
-                <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="collaborative">
+                <button class="tab-btn px-5 py-2.5 font-semibold text-gray-600" data-tab="collaborative">
                     <i class="fas fa-heart mr-2"></i>{% trans "Collaborative" %}
                 </button>
-                <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-transparent text-gray-600" data-tab="delay-check">
+                <button class="tab-btn px-5 py-2.5 font-semibold text-gray-600" data-tab="delay-check">
                     <i class="fas fa-shield-alt mr-2"></i>{% trans "Delay Protection" %}
                 </button>
             </div>
@@ -59,63 +265,57 @@
 
         <!-- Feature 1: Nearest Alternate -->
         <div id="nearest-alternate" class="tab-content">
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="surface-card p-7 mb-6">
                 <h2 class="text-2xl font-bold mb-4">{% trans "Nearest Alternate Optimization" %}</h2>
                 <p class="text-gray-600 mb-6">{% trans "Find cheaper flights to nearby airports and calculate total trip cost" %}</p>
                 
-                <form id="nearestAlternateForm" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label for="origin_query" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Your Origin (city/address/airport)" %}</label>
-                            <input type="text" id="origin_query" name="origin_query" placeholder="{% trans 'e.g., Luxembourg or LUX' %}" required
+                <form id="nearestAlternateForm" class="space-y-3">
+                    <fieldset class="momondo-trip-type">
+                        <legend class="block text-sm font-medium text-gray-700 mb-2">{% trans "Trip Type" %}</legend>
+                        <div class="trip-type-group">
+                            <label class="trip-type-option active" data-trip-value="one_way">
+                                <input type="radio" name="trip_type" value="one_way" checked class="sr-only">
+                                <span>{% trans "One Way" %}</span>
+                            </label>
+                            <label class="trip-type-option" data-trip-value="round_trip">
+                                <input type="radio" name="trip_type" value="round_trip" class="sr-only">
+                                <span>{% trans "Round Trip" %}</span>
+                            </label>
+                        </div>
+                    </fieldset>
+                    <div class="momondo-search-bar">
+                        <div class="momondo-search-field">
+                            <label for="origin_query" class="sr-only">{% trans "Your Origin (city/address/airport)" %}</label>
+                            <input type="text" id="origin_query" name="origin_query" placeholder="{% trans 'From: city or airport (e.g., LUX)' %}" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
-                        <div>
-                            <label for="destination_query" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Destination (country/city/airport)" %}</label>
-                            <input type="text" id="destination_query" name="destination_query" placeholder="{% trans 'e.g., Croatia or ZAG' %}" required
+                        <button type="button" id="swapNearestRouteBtn" class="swap-route-btn tap-target" aria-label="{% trans 'Swap origin and destination' %}">
+                            <i class="fas fa-right-left"></i>
+                        </button>
+                        <div class="momondo-search-field">
+                            <label for="destination_query" class="sr-only">{% trans "Destination (country/city/airport)" %}</label>
+                            <input type="text" id="destination_query" name="destination_query" placeholder="{% trans 'To: country, city or airport' %}" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
-                        <div class="md:col-span-2">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="nearest_alternate_date" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Departure Date" %}</label>
-                                    <input type="date" id="nearest_alternate_date" name="date" required
-                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                </div>
-                                <div id="returnDateWrap" class="hidden">
-                                    <label for="nearest_alternate_return_date" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Return Date" %}</label>
-                                    <input type="date" id="nearest_alternate_return_date" name="return_date"
-                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                                </div>
-                            </div>
-                        </div>
-                        <fieldset>
-                            <legend class="block text-sm font-medium text-gray-700 mb-2">{% trans "Trip Type" %}</legend>
-                            <div class="flex items-center gap-4 rounded-lg border border-gray-300 px-4 py-2">
-                                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                    <input type="radio" name="trip_type" value="one_way" checked class="text-blue-600 focus:ring-blue-500">
-                                    <span>{% trans "One Way" %}</span>
-                                </label>
-                                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                    <input type="radio" name="trip_type" value="round_trip" class="text-blue-600 focus:ring-blue-500">
-                                    <span>{% trans "Round Trip" %}</span>
-                                </label>
-                            </div>
-                        </fieldset>
-                        <div>
-                            <label for="origin_radius_km" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Origin Radius (km)" %}</label>
-                            <input type="number" id="origin_radius_km" name="origin_radius_km" value="220" min="10" max="800"
+                        <div class="momondo-search-field">
+                            <label for="nearest_alternate_date" class="sr-only">{% trans "Departure Date" %}</label>
+                            <input type="date" id="nearest_alternate_date" name="date" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
-                        <div>
-                            <label for="max_results" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Max Results" %}</label>
-                            <input type="number" id="max_results" name="max_results" value="20" min="1" max="100"
+                        <div id="returnDateWrap" class="return-date-inline">
+                            <label for="nearest_alternate_return_date" class="sr-only">{% trans "Return Date" %}</label>
+                            <input type="date" id="nearest_alternate_return_date" name="return_date"
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
+                        <button type="submit" class="momondo-search-btn tap-target">
+                            <i class="fas fa-search mr-2"></i>{% trans "Search" %}
+                        </button>
                     </div>
-                    <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
-                        <i class="fas fa-search mr-2"></i>{% trans "Search" %}
-                    </button>
+                    <div>
+                        <label for="origin_radius_km" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Origin Radius (km)" %}</label>
+                        <input type="number" id="origin_radius_km" name="origin_radius_km" value="220" min="10" max="800"
+                            class="w-full md:w-56 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
                 </form>
             </div>
             <div id="nearestAlternateResults" class="space-y-4"></div>
@@ -123,16 +323,21 @@
 
         <!-- Feature 2: Multi-Modal -->
         <div id="multi-modal" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="surface-card p-7 mb-6">
                 <h2 class="text-2xl font-bold mb-4">{% trans "Multi-Modal Connection Logic" %}</h2>
                 <p class="text-gray-600 mb-6">{% trans "Find connections with train links and layover quality scores" %}</p>
                 
                 <form id="multiModalForm" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
                             <label for="multi_modal_origin" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Origin Airport" %}</label>
                             <input type="text" id="multi_modal_origin" name="origin_airport_code" placeholder="{% trans 'e.g., BRU' %}" required
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex items-end">
+                            <button type="button" id="swapMultiModalRouteBtn" class="swap-route-btn tap-target w-full md:w-11" aria-label="{% trans 'Swap origin and destination' %}">
+                                <i class="fas fa-right-left"></i>
+                            </button>
                         </div>
                         <div>
                             <label for="multi_modal_destination" class="block text-sm font-medium text-gray-700 mb-2">{% trans "Destination Airport" %}</label>
@@ -145,9 +350,11 @@
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                     </div>
-                    <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
-                        <i class="fas fa-search mr-2"></i>{% trans "Find Connections" %}
-                    </button>
+                    <div class="mobile-submit-bar">
+                        <button type="submit" class="primary-action w-full gradient-bg text-white py-3.5 hover:opacity-95">
+                            <i class="fas fa-search mr-2"></i>{% trans "Find Connections" %}
+                        </button>
+                    </div>
                 </form>
             </div>
             <div id="multiModalResults" class="space-y-4"></div>
@@ -155,7 +362,7 @@
 
         <!-- Feature 3: AI Search -->
         <div id="ai-search" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="surface-card p-7 mb-6">
                 <h2 class="text-2xl font-bold mb-4">{% trans "AI Search" %}</h2>
                 <p class="text-gray-600 mb-6">{% trans "Write your trip in plain text — e.g. origin, destination type, budget, or dates." %}</p>
                 
@@ -165,9 +372,11 @@
                         <textarea id="ai_query" name="query" rows="3" placeholder='{% trans "e.g., From Milan I want a warm beach under €300, max 5 hours flight" %}'
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required></textarea>
                     </div>
-                    <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
-                        <i class="fas fa-search mr-2"></i>Search
-                    </button>
+                    <div class="mobile-submit-bar">
+                        <button type="submit" class="primary-action w-full gradient-bg text-white py-3.5 hover:opacity-95">
+                            <i class="fas fa-search mr-2"></i>Search
+                        </button>
+                    </div>
                 </form>
             </div>
             <div id="aiSearchResults" class="space-y-4"></div>
@@ -175,7 +384,7 @@
 
         <!-- Feature 4: Collaborative -->
         <div id="collaborative" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="surface-card p-7 mb-6">
                 <h2 class="text-2xl font-bold mb-4">{% trans "Collaborative Trip Planning" %}</h2>
                 <p class="text-gray-600 mb-6">{% trans "Plan trips together with your partner" %}</p>
                 
@@ -205,7 +414,7 @@
 
         <!-- Feature 5: Delay Protection -->
         <div id="delay-check" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="surface-card p-7 mb-6">
                 <h2 class="text-2xl font-bold mb-4">{% trans "Delay Prediction & Self-Transfer Insurance" %}</h2>
                 <p class="text-gray-600 mb-6">{% trans "Check delay probability and self-transfer safety" %}</p>
                 
@@ -215,9 +424,11 @@
                         <input type="number" id="flight_id" name="flight_id" placeholder="{% trans 'Enter flight ID' %}" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90">
-                        <i class="fas fa-shield-alt mr-2"></i>{% trans "Check Delay Risk" %}
-                    </button>
+                    <div class="mobile-submit-bar">
+                        <button type="submit" class="primary-action w-full gradient-bg text-white py-3.5 hover:opacity-95">
+                            <i class="fas fa-shield-alt mr-2"></i>{% trans "Check Delay Risk" %}
+                        </button>
+                    </div>
                 </form>
             </div>
             <div id="delayCheckResults" class="space-y-4"></div>
@@ -287,7 +498,18 @@
             returnLeg: "{% trans 'Return' %}",
             departs: "{% trans 'Departs' %}",
             arrives: "{% trans 'Arrives' %}",
-            notAvailable: "{% trans 'N/A' %}"
+            notAvailable: "{% trans 'N/A' %}",
+            compareBookingSites: "{% trans 'Compare booking sites' %}",
+            whereToBook: "{% trans 'Where to book' %}",
+            estimatedFinal: "{% trans 'Estimated final' %}",
+            flexible: "{% trans 'Flexible' %}",
+            partial: "{% trans 'Partial refund' %}",
+            restricted: "{% trans 'Restricted' %}",
+            best: "{% trans 'Best' %}",
+            cheapest: "{% trans 'Cheapest' %}",
+            mostFlexible: "{% trans 'Most flexible' %}",
+            bookNow: "{% trans 'Book now' %}",
+            bookBestOption: "{% trans 'Book best option' %}",
         };
         
         // Tab switching
@@ -295,16 +517,43 @@
             btn.addEventListener('click', () => {
                 const tab = btn.dataset.tab;
                 document.querySelectorAll('.tab-btn').forEach(b => {
-                    b.classList.remove('active', 'text-blue-600', 'border-b-2', 'border-blue-600');
+                    b.classList.remove('active');
                     b.classList.add('text-gray-600');
                 });
-                btn.classList.add('active', 'text-blue-600', 'border-b-2', 'border-blue-600');
+                btn.classList.add('active');
                 btn.classList.remove('text-gray-600');
                 
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
                 document.getElementById(tab).classList.remove('hidden');
             });
         });
+
+        function swapInputValues(originId, destinationId) {
+            const fromInput = document.getElementById(originId);
+            const toInput = document.getElementById(destinationId);
+            if (!fromInput || !toInput) {
+                return;
+            }
+            const tmp = fromInput.value;
+            fromInput.value = toInput.value;
+            toInput.value = tmp;
+            fromInput.dispatchEvent(new Event('input', { bubbles: true }));
+            toInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        const nearestSwapBtn = document.getElementById('swapNearestRouteBtn');
+        if (nearestSwapBtn) {
+            nearestSwapBtn.addEventListener('click', () => {
+                swapInputValues('origin_query', 'destination_query');
+            });
+        }
+
+        const multiModalSwapBtn = document.getElementById('swapMultiModalRouteBtn');
+        if (multiModalSwapBtn) {
+            multiModalSwapBtn.addEventListener('click', () => {
+                swapInputValues('multi_modal_origin', 'multi_modal_destination');
+            });
+        }
 
         // Feature 1: Nearest Alternate
         function syncRoundTripFields() {
@@ -321,8 +570,12 @@
             } else {
                 returnInput.removeAttribute('min');
             }
-            returnWrap.classList.toggle('hidden', !isRoundTrip);
+            returnWrap.classList.toggle('expanded', !!isRoundTrip);
             returnInput.required = !!isRoundTrip;
+            returnInput.disabled = !isRoundTrip;
+            document.querySelectorAll('[data-trip-value]').forEach((option) => {
+                option.classList.toggle('active', option.dataset.tripValue === selected.value);
+            });
             if (!isRoundTrip) {
                 returnInput.value = '';
             }
@@ -413,6 +666,64 @@
             return dt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
         }
 
+        function refundabilityLabel(refundability) {
+            if (refundability === 'flexible') {
+                return I18N.flexible;
+            }
+            if (refundability === 'partial') {
+                return I18N.partial;
+            }
+            return I18N.restricted;
+        }
+
+        function badgeLabel(badge) {
+            if (badge === 'best') {
+                return I18N.best;
+            }
+            if (badge === 'cheapest') {
+                return I18N.cheapest;
+            }
+            if (badge === 'most_flexible') {
+                return I18N.mostFlexible;
+            }
+            return '';
+        }
+
+        function buildBookingOptionsComparisonHtml(result, currencySymbol, exchangeRate) {
+            const options = result.booking_options || [];
+            if (!options.length) {
+                return '';
+            }
+            const rows = options.slice(0, 4).map((option) => {
+                const convertedTotal = Number(option.total_price_eur || 0) * exchangeRate;
+                const badgeHtml = (option.badges || []).slice(0, 2).map((badge) => {
+                    const label = badgeLabel(badge);
+                    if (!label) {
+                        return '';
+                    }
+                    return '<span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">' + label + '</span>';
+                }).join(' ');
+                return (
+                    '<div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200/70 py-2.5 first:border-t-0 first:pt-0">' +
+                    '<div class="flex items-center gap-2">' +
+                    (option.provider_logo_url ? '<img src="' + option.provider_logo_url + '" alt="' + option.provider_name + ' logo" class="h-6 w-6 rounded object-contain bg-white" onerror="this.style.display=\'none\'">' : '') +
+                    '<div><a href="' + (option.booking_url || option.deep_link) + '" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-gray-800 hover:underline">' + option.provider_name + '</a>' +
+                    '<p class="text-xs text-gray-500">' + refundabilityLabel(option.refundability) + ' · ' + option.included_baggage_kg + 'kg bag</p></div>' +
+                    '</div>' +
+                    '<div class="text-right"><p class="text-sm font-bold text-green-700">' + currencySymbol + convertedTotal.toFixed(2) + '</p>' +
+                    '<p class="text-xs text-gray-500">' + I18N.estimatedFinal + '</p></div>' +
+                    '<div class="flex items-center gap-2">' + badgeHtml +
+                    '<a href="' + (option.booking_url || option.deep_link) + '" target="_blank" rel="noopener noreferrer" class="text-xs text-blue-600 underline">' + I18N.bookNow + '</a></div>' +
+                    '</div>'
+                );
+            }).join('');
+            return (
+                '<details class="mt-3 rounded-xl border border-gray-200 bg-gray-50/80 p-3.5">' +
+                '<summary class="cursor-pointer text-sm font-semibold text-gray-700">' + I18N.compareBookingSites + ' (' + options.length + ')</summary>' +
+                '<div class="mt-2">' + rows + '</div></details>'
+            );
+        }
+
         function buildNearestAlternateCard(result, idx, currencySymbol, exchangeRate) {
             const flight = result.flight || {};
             const origin = (flight.origin_airport && flight.origin_airport.iata_code) || '—';
@@ -462,48 +773,62 @@
                     ${I18N.departs} ${returnDep} · ${I18N.arrives} ${returnArr} · ${returnHours}h ${returnMinsOnly}m
                 </div>
             ` : '';
+            const bookingOptionsHtml = buildBookingOptionsComparisonHtml(result, currencySymbol, exchangeRate);
+            const bestOption = result.best_booking_option || (result.booking_options && result.booking_options[0]) || null;
+            const bestOptionUrl = bestOption ? (bestOption.booking_url || bestOption.deep_link) : '';
+            const bestOptionName = bestOption ? (bestOption.provider_name || '') : '';
+            const bestOptionLabelSuffix = bestOptionName ? ' · ' + bestOptionName : '';
+            const mobileBookBestCta = bestOptionUrl ? `
+                <div class="mobile-book-cta sm:hidden">
+                    <a href="${bestOptionUrl}" target="_blank" rel="noopener noreferrer"
+                       class="tap-target inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                       <i class="fas fa-arrow-up-right-from-square mr-2"></i>${I18N.bookBestOption}${bestOptionLabelSuffix}
+                    </a>
+                </div>
+            ` : '';
             return `
-                <div class="bg-white rounded-lg shadow-md p-6 card-hover">
-                    <div class="flex justify-between items-start mb-4">
+                <div class="surface-card p-5 sm:p-6 card-hover">
+                    <div class="flex flex-col sm:flex-row justify-between items-start mb-4 gap-4">
                         <div>
-                            <h3 class="text-xl font-bold">${I18N.option} ${idx + 1}</h3>
-                            <p class="text-sm text-blue-700 font-semibold">${tripTypeLabel}</p>
-                            <p class="text-gray-700">${originLabel} <i class="fas fa-arrow-right mx-1 text-xs"></i> ${destinationLabel}</p>
-                            <p class="text-sm text-gray-500">${originDistance} km ${I18N.fromYourLocation} · ${destinationDistance} km ${I18N.fromDestinationCenter}</p>
+                            <div class="inline-flex items-center rounded-full bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-1 mb-2">${I18N.option} ${idx + 1} · ${tripTypeLabel}</div>
+                            <p class="text-lg font-semibold text-gray-900">${originLabel} <i class="fas fa-arrow-right mx-1 text-xs text-gray-400"></i> ${destinationLabel}</p>
+                            <p class="text-sm text-gray-500 mt-1">${originDistance} km ${I18N.fromYourLocation} · ${destinationDistance} km ${I18N.fromDestinationCenter}</p>
                         </div>
                         <div class="text-right">
-                            <p class="text-2xl font-bold text-green-600">${currencySymbol}${totalCost.toFixed(2)}</p>
-                            <p class="text-sm text-gray-600">${I18N.totalCost}</p>
+                            <p class="text-2xl font-semibold text-gray-900">${currencySymbol}${totalCost.toFixed(2)}</p>
+                            <p class="text-sm text-gray-500">${I18N.totalCost}</p>
                         </div>
                     </div>
-                    <div class="mb-4 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                    <div class="mb-4 rounded-xl bg-blue-50/70 px-3.5 py-3 text-sm text-blue-900">
                         <span class="font-semibold">${I18N.groundLabel}</span> ${groundSummary} (${groundMode}) · ${groundHours}h ${groundMinsOnly}m
                         <span class="mx-2">|</span>
                         <span class="font-semibold">${I18N.flightLabel}</span> ${origin} → ${dest} · ${flightHours}h ${flightMinsOnly}m
                         ${outboundLine}
                         ${returnLine}
                     </div>
-                    <div class="grid grid-cols-2 gap-4 mt-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                         <div>
-                            <p class="text-sm text-gray-600">${I18N.flightCost}</p>
-                            <p class="font-semibold">${currencySymbol}${flightCost.toFixed(2)}</p>
+                            <p class="text-sm text-gray-500">${I18N.flightCost}</p>
+                            <p class="font-semibold text-gray-900">${currencySymbol}${flightCost.toFixed(2)}</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-600">${I18N.groundTransport}</p>
-                            <p class="font-semibold">${currencySymbol}${groundCost.toFixed(2)}</p>
+                            <p class="text-sm text-gray-500">${I18N.groundTransport}</p>
+                            <p class="font-semibold text-gray-900">${currencySymbol}${groundCost.toFixed(2)}</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-600">${I18N.totalTime}</p>
-                            <p class="font-semibold">${timeH}h ${timeM}m</p>
+                            <p class="text-sm text-gray-500">${I18N.totalTime}</p>
+                            <p class="font-semibold text-gray-900">${timeH}h ${timeM}m</p>
                         </div>
-                        <div class="flex flex-col items-start space-y-2 sm:items-end sm:space-y-0 sm:flex-row sm:space-x-3">
+                        <div class="flex flex-col items-stretch sm:items-end space-y-2 sm:space-y-0 sm:flex-row sm:space-x-3">
                             <button onclick="saveTripByIndex(${idx})" 
-                                class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
+                                class="tap-target w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-sm font-semibold">
                                 <i class="fas fa-bookmark mr-1"></i>${I18N.saveTrip}
                             </button>
                             ${bookingLinkHtml || ''}
                         </div>
                     </div>
+                    ${bookingOptionsHtml}
+                    ${mobileBookBestCta}
                 </div>
             `;
         }
@@ -580,10 +905,10 @@
             return (
                 '<div class="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-white p-3">' +
                 '<span class="text-sm font-semibold text-gray-700 mr-2">{% trans "Sort results:" %}</span>' +
-                '<button type="button" onclick="applyNearestResultsSort(\'best\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'best' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Best" %}</button>' +
-                '<button type="button" onclick="applyNearestResultsSort(\'cheapest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'cheapest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Cheapest" %}</button>' +
-                '<button type="button" onclick="applyNearestResultsSort(\'quickest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'quickest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Quickest" %}</button>' +
-                '<button type="button" onclick="applyNearestResultsSort(\'nearest\')" class="px-3 py-1 rounded-full text-sm ' + (mode === 'nearest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Nearest Airport" %}</button>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'best\')" class="tap-target px-3 py-1.5 rounded-full text-sm ' + (mode === 'best' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Best" %}</button>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'cheapest\')" class="tap-target px-3 py-1.5 rounded-full text-sm ' + (mode === 'cheapest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Cheapest" %}</button>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'quickest\')" class="tap-target px-3 py-1.5 rounded-full text-sm ' + (mode === 'quickest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Quickest" %}</button>' +
+                '<button type="button" onclick="applyNearestResultsSort(\'nearest\')" class="tap-target px-3 py-1.5 rounded-full text-sm ' + (mode === 'nearest' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700') + '">{% trans "Nearest Airport" %}</button>' +
                 '</div>'
             );
         }

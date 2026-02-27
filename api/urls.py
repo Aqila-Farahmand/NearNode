@@ -7,6 +7,7 @@ from .views import (
     get_perfect_matches, predict_delay, check_self_transfer_insurance,
     get_user_profile, update_user_profile,
     nearest_airport,
+    booking_provider_health,
 )
 
 router = DefaultRouter()
@@ -41,4 +42,5 @@ urlpatterns = [
     path('profile/', get_user_profile, name='user-profile'),
     path('profile/update/', update_user_profile, name='update-profile'),
     path('nearest-airport/', nearest_airport, name='nearest-airport'),
+    path('booking-providers/health/', booking_provider_health, name='booking-provider-health'),
 ]
